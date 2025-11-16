@@ -184,28 +184,25 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
         <h2 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-800 dark:text-gray-100`}>
           {currentLocale === "en" ? "Inbox" : "收件箱"}
         </h2>
-        {/* 状态指示器 */}
+        {/* 状态指示器（仅展示轮询状态，Mercure 已移除） */}
         <div className={`flex items-center gap-2 text-xs text-gray-500 ${isMobile ? 'mt-1' : 'mt-2'} ${isMobile ? 'flex-wrap' : ''}`}>
-          <div className={`w-2 h-2 rounded-full ${
-            smartChecker.isUsingMercure ? 'bg-green-500 animate-pulse' :
-            smartChecker.isUsingPolling ? 'bg-yellow-500' :
-            smartChecker.mercureAttempted ? 'bg-red-500' : 'bg-gray-400'
-          }`} />
+          <div
+            className={`w-2 h-2 rounded-full ${
+              isEnabled ? "bg-green-500 animate-pulse" : "bg-gray-400"
+            }`}
+          />
           <span className={isMobile ? 'text-xs' : ''}>
-            {smartChecker.isUsingMercure ? (isMobile ? '🚀 实时连接' : '🚀 实时连接 (Mercure SSE)') :
-             smartChecker.isUsingPolling ? (isMobile ? '🔄 轮询模式' : '🔄 轮询模式 (30秒间隔)') :
-             smartChecker.mercureAttempted ?
-               (isEnabled ? (isMobile ? '❌ 实时失败，轮询可用' : '❌ 实时失败，轮询可用') : (isMobile ? '❌ 实时失败，轮询已禁用' : '❌ 实时失败，轮询已禁用')) :
-               '⏳ 连接中...'}
+            {isEnabled
+              ? currentLocale === "en"
+                ? "🔄 Polling for new messages (1s interval)"
+                : "🔄 正在轮询新邮件（1秒间隔）"
+              : currentLocale === "en"
+                ? "⏸ Polling paused"
+                : "⏸ 轮询已暂停"}
           </span>
           <span className="text-xs text-gray-400 ml-2">
             邮件数: {messages.length}
           </span>
-          {smartChecker.mercureAttempted && !smartChecker.isUsingMercure && !isEnabled && (
-            <span className="text-xs text-red-500 ml-2">
-              (备用策略已禁用)
-            </span>
-          )}
         </div>
       </div>
       <div className={`${isMobile ? 'space-y-2' : 'space-y-4'} w-full`}>
