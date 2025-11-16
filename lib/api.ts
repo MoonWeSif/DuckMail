@@ -1,7 +1,7 @@
 import type { Account, Domain, Message, MessageDetail } from "@/types"
 
-// 直接指向改造后的 inbucket 实例
-const API_BASE_URL = "https://mail.duckmail.sbs"
+// 直接指向 DuckMail API 服务
+const API_BASE_URL = "https://api.duckmail.sbs"
 
 // 获取默认API提供商配置（用于向后兼容）
 function getDefaultProviderConfig() {
@@ -67,7 +67,6 @@ function inferProviderFromEmail(email: string): string {
 
     // 首先检查已知的域名模式
     const knownDomainPatterns: Record<string, string> =   {
-      // Mail.tm 的常见域名
       "1secmail.com": "mailtm"
     }
 

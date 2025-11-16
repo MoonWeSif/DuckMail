@@ -7,7 +7,7 @@ import { Avatar } from "@heroui/avatar"
 import { getMessages } from "@/lib/api"
 import type { Message } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
-import { useSmartMailChecker } from "@/hooks/use-smart-mail-checker"
+import { useMailChecker } from "@/hooks/use-mail-checker"
 import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useMailStatus } from "@/contexts/mail-status-context"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -68,23 +68,13 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     }
   }, [token, currentAccount, currentLocale])
 
-  // 使用智能邮件检查器：
-  // - Mercure SSE 总是尝试连接（不受 isEnabled 控制）
-  // - 轮询策略只在 Mercure 失败时启用，受 isEnabled 控制
-  const smartChecker = useSmartMailChecker({
+  // 使用简单轮询方案：每 1 秒检查一次新邮件
+  useMailChecker({
     onNewMessage: handleNewMessage,
     onMessagesUpdate: handleMessagesUpdate,
-    enabled: isEnabled, // 只控制备用轮询策略
+    interval: 1000,
+    enabled: isEnabled,
   })
-
-  // 调试信息
-  useEffect(() => {
-    if (smartChecker.isUsingMercure) {
-      console.log("🚀 [MessageList] Using Mercure SSE for real-time updates")
-    } else if (smartChecker.isUsingPolling) {
-      console.log("🔄 [MessageList] Using polling as fallback")
-    }
-  }, [smartChecker.isUsingMercure, smartChecker.isUsingPolling])
 
   // 初始加载 - 当账户或token变化时重新加载
   useEffect(() => {
