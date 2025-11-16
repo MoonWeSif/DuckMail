@@ -10,7 +10,6 @@ import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useMailStatus } from "@/contexts/mail-status-context"
-import { useSmartMailChecker } from "@/hooks/use-smart-mail-checker"
 import { SettingsPanel } from "@/components/settings-panel"
 
 interface HeaderProps {
@@ -29,12 +28,6 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { toast } = useHeroUIToast()
   const { isEnabled, setIsEnabled } = useMailStatus()
-
-  // 获取智能邮件检查器的状态
-  // 注意：这里的 enabled 只控制轮询策略，不影响 Mercure
-  const smartChecker = useSmartMailChecker({
-    enabled: isEnabled, // 只控制备用轮询策略
-  })
 
   useEffect(() => {
     setMounted(true)
@@ -78,28 +71,9 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
     const newState = !isEnabled
     setIsEnabled(newState)
 
-    // 根据当前策略状态提供不同的提示
-    let title, description
-
-    if (smartChecker.isUsingMercure) {
-      // Mercure 连接成功时，按钮不影响邮件检查
-      title = newState ? "备用策略已启用" : "备用策略已禁用"
-      description = "实时连接正常，此设置仅影响备用轮询策略"
-    } else if (smartChecker.mercureAttempted && !smartChecker.isUsingMercure) {
-      // Mercure 失败时，按钮控制轮询策略
-      title = newState ? "已启用备用邮件检查" : "已禁用备用邮件检查"
-      description = newState ?
-        "实时连接失败，已启用轮询模式 (30秒间隔)" :
-        "实时连接失败，备用轮询也已禁用"
-    } else {
-      // 连接中时
-      title = newState ? "备用策略已启用" : "备用策略已禁用"
-      description = "正在尝试实时连接，此设置影响备用策略"
-    }
-
     toast({
-      title,
-      description,
+      title: newState ? "已开启邮件自动检查" : "已关闭邮件自动检查",
+      description: newState ? "每 1 秒自动刷新收件箱" : "不再自动刷新收件箱，可手动点击刷新",
       color: newState ? "success" : "warning",
       variant: "flat",
       icon: <Wifi size={16} />,
@@ -151,63 +125,23 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                   onPress={toggleMailChecker}
                   className="text-gray-600 dark:text-gray-300"
                   aria-label={
-                    smartChecker.isUsingMercure ?
-                      (isEnabled ? "禁用备用策略" : "启用备用策略") :
-                      (isEnabled ? "禁用备用轮询" : "启用备用轮询")
+                    isEnabled ? "关闭邮件自动检查" : "开启邮件自动检查"
                   }
                 >
                   <Wifi
                     size={16}
-                    className={`${
-                      smartChecker.isUsingMercure ?
-                        'text-green-500 animate-pulse' : // Mercure 连接成功，按钮显示绿色
-                      smartChecker.isUsingPolling ?
-                        'text-yellow-500' : // 轮询模式运行中
-                      smartChecker.mercureAttempted ?
-                        (isEnabled ? 'text-yellow-400' : 'text-red-500') : // Mercure 失败，根据轮询状态显示
-                      'text-blue-500' // 连接中
-                    }`}
+                    className={isEnabled ? "text-green-500" : "text-gray-400"}
                   />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-xs">
                 <div className="space-y-1">
-                  {smartChecker.isUsingMercure ? (
-                    <>
-                      <p className="font-medium text-green-600">🚀 实时连接活跃</p>
-                      <p className="text-xs">使用 Mercure SSE，立即接收新邮件</p>
-                      <p className="text-xs text-gray-500">
-                        备用策略: {isEnabled ? '已启用' : '已禁用'}
-                      </p>
-                      <p className="text-xs text-blue-500">
-                        点击{isEnabled ? '禁用' : '启用'}备用策略
-                      </p>
-                    </>
-                  ) : smartChecker.isUsingPolling ? (
-                    <>
-                      <p className="font-medium text-yellow-600">🔄 备用模式运行中</p>
-                      <p className="text-xs">实时连接失败，使用轮询 (30秒间隔)</p>
-                      <p className="text-xs text-blue-500">点击禁用备用轮询</p>
-                    </>
-                  ) : smartChecker.mercureAttempted ? (
-                    <>
-                      <p className="font-medium text-red-600">❌ 实时连接失败</p>
-                      <p className="text-xs">
-                        备用轮询: {isEnabled ? '可用' : '已禁用'}
-                      </p>
-                      <p className="text-xs text-blue-500">
-                        点击{isEnabled ? '禁用' : '启用'}备用轮询
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-medium text-blue-600">⏳ 正在连接...</p>
-                      <p className="text-xs">正在尝试建立实时连接</p>
-                      <p className="text-xs text-gray-500">
-                        备用策略: {isEnabled ? '已启用' : '已禁用'}
-                      </p>
-                    </>
-                  )}
+                  <p className="font-medium text-sm">
+                    {isEnabled ? "邮件自动检查已开启" : "邮件自动检查已关闭"}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {isEnabled ? "当前每 1 秒轮询一次收件箱" : "不会自动轮询，可手动点击刷新按钮查看新邮件"}
+                  </p>
                 </div>
               </TooltipContent>
             </Tooltip>
