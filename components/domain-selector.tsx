@@ -26,8 +26,8 @@ export function DomainSelector({ value, onSelectionChange, currentLocale, isDisa
         setLoading(true)
         setError(null)
 
-        // 获取启用的提供商列表
-        const disabledProviders = JSON.parse(localStorage.getItem("disabled-api-providers") || "[]")
+        // 获取启用的提供商列表（默认禁用 mail.tm，用户可在设置中手动启用）
+        const disabledProviders = JSON.parse(localStorage.getItem("disabled-api-providers") || '["mailtm"]')
         const presetProviders = [
           { id: "duckmail", name: "DuckMail" },
           { id: "mailtm", name: "Mail.tm" },

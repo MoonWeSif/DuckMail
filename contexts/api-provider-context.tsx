@@ -43,7 +43,8 @@ interface ApiProviderProviderProps {
 
 export function ApiProviderProvider({ children }: ApiProviderProviderProps) {
   const [customProviders, setCustomProviders] = useState<CustomApiProvider[]>([])
-  const [disabledProviderIds, setDisabledProviderIds] = useState<string[]>([])
+  // 默认禁用 mail.tm，用户可在设置中手动启用
+  const [disabledProviderIds, setDisabledProviderIds] = useState<string[]>(["mailtm"])
   const [apiKey, setApiKeyState] = useState<string>("")
 
   // 所有提供商（预设 + 自定义）

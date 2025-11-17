@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal"
 import { Button } from "@heroui/button"
 import { Input } from "@heroui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { Eye, EyeOff, LogIn, AlertCircle } from "lucide-react"
 import { Card, CardBody } from "@heroui/card"
+import { DomainSelector } from "@/components/domain-selector"
 
 interface LoginModalProps {
   isOpen: boolean
@@ -16,29 +17,84 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, accountAddress, currentLocale }: LoginModalProps) {
+  // 完整邮箱登录模式使用的地址
   const [address, setAddress] = useState(accountAddress || "")
+  // 拆分模式使用的用户名和域名
+  const [username, setUsername] = useState("")
+  const [selectedDomain, setSelectedDomain] = useState<string>("")
+  const [loginMode, setLoginMode] = useState<"split" | "full">("split")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const { login } = useAuth()
 
+  // 根据传入的 accountAddress 预填用户名/域名
+  useEffect(() => {
+    if (!isOpen) return
+
+    if (accountAddress) {
+      setAddress(accountAddress)
+      const parts = accountAddress.split("@")
+      if (parts.length === 2) {
+        setUsername(parts[0])
+        setSelectedDomain(parts[1])
+      } else {
+        setUsername(accountAddress)
+        setSelectedDomain("")
+      }
+      // 从现有账号进入时，默认采用“用户名 + 域名”模式
+      setLoginMode("split")
+    } else {
+      // 新打开时重置为拆分模式，方便选择域名
+      setLoginMode("split")
+    }
+  }, [isOpen, accountAddress])
+
+  const canSubmit =
+    !!password &&
+    (loginMode === "full"
+      ? !!address
+      : !!username && !!selectedDomain)
+
   const togglePasswordVisibility = () => setIsPasswordVisible(!isPasswordVisible)
 
   const handleSubmit = async () => {
-    if (!address || !password) {
-      setError(currentLocale === "en" ? "Please fill in email address and password" : "请填写邮箱地址和密码")
-      return
-    }
-
     setIsLoading(true)
     setError(null)
 
+    let loginAddress = address
+
+    if (loginMode === "split") {
+      if (!username || !selectedDomain) {
+        setIsLoading(false)
+        setError(
+          currentLocale === "en"
+            ? "Please fill in username and select a domain"
+            : "请填写用户名并选择域名"
+        )
+        return
+      }
+      loginAddress = `${username}@${selectedDomain}`
+    } else {
+      if (!address) {
+        setIsLoading(false)
+        setError(
+          currentLocale === "en"
+            ? "Please fill in email address and password"
+            : "请填写邮箱地址和密码"
+        )
+        return
+      }
+    }
+
     try {
-      await login(address, password)
+      await login(loginAddress, password)
       onClose()
       // 重置表单
       setAddress("")
+      setUsername("")
+      setSelectedDomain("")
       setPassword("")
       setError(null)
     } catch (error: any) {
@@ -55,6 +111,8 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
     setPassword("")
     if (!accountAddress) {
       setAddress("")
+      setUsername("")
+      setSelectedDomain("")
     }
   }
 
@@ -79,18 +137,76 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
         </ModalHeader>
         <ModalBody>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {currentLocale === "en" ? "Email Address" : "邮箱地址"}
-              </label>
-              <Input
-                type="email"
-                placeholder="example@duckmail.sbs"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                isDisabled={isLoading || !!accountAddress}
-              />
+            {/* 登录方式切换：完整邮箱 / 用户名 + 域名 */}
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <span>{currentLocale === "en" ? "Login mode:" : "登录方式："}</span>
+              <button
+                type="button"
+                className={`px-2 py-1 rounded ${
+                  loginMode === "split"
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                    : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+                onClick={() => setLoginMode("split")}
+                disabled={isLoading}
+              >
+                {currentLocale === "en" ? "Username + Domain" : "用户名 + 域名"}
+              </button>
+              <span>/</span>
+              <button
+                type="button"
+                className={`px-2 py-1 rounded ${
+                  loginMode === "full"
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                    : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+                onClick={() => setLoginMode("full")}
+                disabled={isLoading}
+              >
+                {currentLocale === "en" ? "Full Email" : "完整邮箱"}
+              </button>
             </div>
+
+            {loginMode === "full" ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {currentLocale === "en" ? "Email Address" : "邮箱地址"}
+                </label>
+                <Input
+                  type="email"
+                  placeholder="example@duckmail.sbs"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  isDisabled={isLoading || !!accountAddress}
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {currentLocale === "en" ? "Username" : "用户名"}
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder={currentLocale === "en" ? "your_name" : "你的用户名"}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    isDisabled={isLoading || !!accountAddress}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <DomainSelector
+                    value={selectedDomain}
+                    onSelectionChange={(domain) => {
+                      setSelectedDomain(domain)
+                    }}
+                    currentLocale={currentLocale}
+                    isDisabled={isLoading}
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -147,7 +263,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
             color="primary"
             onPress={handleSubmit}
             isLoading={isLoading}
-            isDisabled={!address || !password}
+            isDisabled={!canSubmit}
           >
             {currentLocale === "en" ? "Login" : "登录"}
           </Button>

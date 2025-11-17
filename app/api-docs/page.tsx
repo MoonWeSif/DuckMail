@@ -157,6 +157,13 @@ const apiEndpoints = {
           description: "获取当前已认证账户的信息。",
           authType: "required-token",
         },
+        {
+          method: "DELETE",
+          path: "/accounts/{id}",
+          description: "通过 ID 删除当前已认证的邮箱账户。只能删除当前登录的账户。",
+          authType: "required-token",
+          pathParams: [{ name: "id", value: "" }],
+        },
       ],
     },
     {
@@ -230,6 +237,13 @@ const apiEndpoints = {
           path: "/me",
           description: "Get information about the currently authenticated account.",
           authType: "required-token",
+        },
+        {
+          method: "DELETE",
+          path: "/accounts/{id}",
+          description: "Delete the currently authenticated email account by ID. You can only delete your own account.",
+          authType: "required-token",
+          pathParams: [{ name: "id", value: "" }],
         },
       ],
     },
