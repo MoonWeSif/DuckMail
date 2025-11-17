@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { Account, AuthState } from "@/types"
-import { createAccount, getToken, getAccount } from "@/lib/api"
+import { createAccount, getToken, getAccount, deleteAccount as deleteAccountApi } from "@/lib/api"
 
 interface AuthContextType extends AuthState {
   login: (address: string, password: string) => Promise<void>
@@ -146,25 +146,112 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     console.log("🚪 [Auth] Logging out current account")
-    setAuthState({
-      token: null,
-      currentAccount: null,
-      accounts: authState.accounts, // 保留所有账户信息
-      isAuthenticated: false,
-    })
-    // 不要删除 localStorage，因为我们要保留账户列表
+
+    const { currentAccount, accounts } = authState
+
+    // 没有当前账户时，直接清除认证状态但保留账户列表
+    if (!currentAccount) {
+      setAuthState({
+        ...authState,
+        token: null,
+        isAuthenticated: false,
+      })
+      return
+    }
+
+    // 从账户列表中彻底移除当前账户（不再保留在下拉列表和 localStorage 中）
+    const remainingAccounts = accounts.filter((account) => account.id !== currentAccount.id)
+
+    // 如果还有其他账户，则自动切换到下一个账户，避免回到首页
+    if (remainingAccounts.length > 0) {
+      const nextAccount = remainingAccounts[0]
+      console.log(`🔁 [Auth] Other accounts exist, auto switching to: ${nextAccount.address}`)
+
+      setAuthState({
+        token: nextAccount.token || null,
+        currentAccount: nextAccount,
+        accounts: remainingAccounts,
+        isAuthenticated: !!nextAccount.token,
+      })
+    } else {
+      // 只有当前一个账户时，真正退出到未登录状态，并清空账户列表
+      setAuthState({
+        token: null,
+        currentAccount: null,
+        accounts: [],
+        isAuthenticated: false,
+      })
+    }
+    // 不要删除 localStorage，交给 useEffect 根据 authState 自动清理/保存
   }
 
   const deleteAccount = async (id: string) => {
     try {
-      // 实际删除账户的API调用会在这里
-      setAuthState({
-        ...authState,
-        accounts: authState.accounts.filter((account) => account.id !== id),
-        currentAccount: authState.currentAccount?.id === id ? null : authState.currentAccount,
-        isAuthenticated: authState.currentAccount?.id === id ? false : authState.isAuthenticated,
-        token: authState.currentAccount?.id === id ? null : authState.token,
-      })
+      console.log(`🗑️ [Auth] Deleting account: ${id}`)
+      const { currentAccount, accounts, token } = authState
+
+      // 调用后端删除接口，确保账号真的被删除
+      const targetAccount = accounts.find((account) => account.id === id)
+      const providerId = targetAccount?.providerId || "duckmail"
+
+      const deleteToken =
+        currentAccount?.id === id
+          ? token
+          : targetAccount?.token
+
+      if (!deleteToken) {
+        throw new Error("缺少删除该账号所需的登录凭据，请先登录该账号后再尝试删除。")
+      }
+
+      await deleteAccountApi(deleteToken, id, providerId)
+
+      const remainingAccounts = accounts.filter((account) => account.id !== id)
+      const isDeletingCurrent = currentAccount?.id === id
+
+      // 如果删除的不是当前账户，只更新账户列表即可
+      if (!isDeletingCurrent) {
+        setAuthState(prev => ({
+          ...prev,
+          accounts: remainingAccounts,
+        }))
+        return
+      }
+
+      // 删除的是当前账户
+      if (remainingAccounts.length === 0) {
+        // 删除的是最后一个账户，回到未登录状态
+        console.log("🚪 [Auth] Deleted last account, logging out")
+        setAuthState({
+          token: null,
+          currentAccount: null,
+          accounts: [],
+          isAuthenticated: false,
+        })
+        return
+      }
+
+      // 删除的是当前账户，但还有其他账户：
+      // 1）先清除当前无效 token，并保存剩余账户
+      setAuthState(prev => ({
+        ...prev,
+        token: null,
+        currentAccount: null,
+        accounts: remainingAccounts,
+        isAuthenticated: false,
+      }))
+
+      // 2）优先选择仍然有凭据的账户尝试自动切换
+      const candidate =
+        remainingAccounts.find(account => account.token || account.password) ||
+        remainingAccounts[0]
+
+      try {
+        console.log(`🔁 [Auth] Deleted current account, trying to auto switch to: ${candidate.address}`)
+        await switchAccount(candidate)
+      } catch (switchError) {
+        // 自动切换失败：保持未登录状态，但保留 remainingAccounts，方便用户手动登录
+        console.error("❌ [Auth] Auto switch after delete failed:", switchError)
+      }
     } catch (error) {
       console.error("Delete account failed:", error)
       throw error
@@ -175,46 +262,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log(`🔄 [Auth] Switching to account: ${account.address}`)
 
-      // 立即切换到目标账户，提供即时反馈
-      setAuthState({
-        ...authState,
-        token: account.token || null,
-        currentAccount: account,
-        isAuthenticated: !!account.token,
-      })
+      const accountProviderId = account.providerId || "duckmail"
 
-      // 如果有token，在后台验证并更新
+      // 如果既没有 token 也没有密码，直接报错，不修改当前状态
+      if (!account.token && !account.password) {
+        console.warn(`⚠️ [Auth] No credentials available for account: ${account.address}`)
+        throw new Error("缺少登录凭据，请重新登录")
+      }
+
+      const applyAccountWithAuth = (accountWithAuth: Account, token: string) => {
+        setAuthState(prev => {
+          const updatedAccounts = prev.accounts.map((acc) =>
+            acc.address === account.address ? accountWithAuth : acc
+          )
+
+          return {
+            token,
+            currentAccount: accountWithAuth,
+            accounts: updatedAccounts,
+            isAuthenticated: true,
+          }
+        })
+      }
+
       if (account.token) {
         console.log(`🔍 [Auth] Validating existing token for account: ${account.address}`)
         try {
-          const accountProviderId = account.providerId || "duckmail"
+          // 先尝试用现有 token 获取账户信息
           const updatedAccount = await getAccount(account.token, accountProviderId)
           const accountWithAuth = {
             ...updatedAccount,
             password: account.password,
             token: account.token,
-            providerId: account.providerId || "duckmail",
+            providerId: accountProviderId,
           }
 
-          // 更新accounts数组中的账户信息
-          const updatedAccounts = authState.accounts.map((acc) =>
-            acc.address === account.address ? accountWithAuth : acc
-          )
-
           console.log(`✅ [Auth] Token validated, account info updated: ${account.address}`)
-          setAuthState({
-            token: account.token,
-            currentAccount: accountWithAuth,
-            accounts: updatedAccounts,
-            isAuthenticated: true,
-          })
+          applyAccountWithAuth(accountWithAuth, account.token)
+          return
         } catch (tokenError) {
           console.warn(`⚠️ [Auth] Stored token invalid for account: ${account.address}`)
-          // Token 无效，如果有密码则尝试重新获取token
+
+          // Token 无效，如果有密码则尝试重新获取 token
           if (account.password) {
             try {
               console.log(`🔑 [Auth] Token invalid, getting fresh token for account: ${account.address}`)
-              const accountProviderId = account.providerId || "duckmail"
               const { token } = await getToken(account.address, account.password, accountProviderId)
               const updatedAccount = await getAccount(token, accountProviderId)
 
@@ -222,45 +314,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ...updatedAccount,
                 password: account.password,
                 token,
-                providerId: account.providerId || "duckmail",
+                providerId: accountProviderId,
               }
 
-              const updatedAccounts = authState.accounts.map((acc) =>
-                acc.address === account.address ? accountWithAuth : acc
-              )
-
               console.log(`✅ [Auth] Fresh token obtained, switched to account: ${account.address}`)
-              setAuthState({
-                token,
-                currentAccount: accountWithAuth,
-                accounts: updatedAccounts,
-                isAuthenticated: true,
-              })
+              applyAccountWithAuth(accountWithAuth, token)
+              return
             } catch (refreshError) {
               console.error(`❌ [Auth] Failed to refresh token for account: ${account.address}`)
-              setAuthState({
-                ...authState,
-                token: null,
-                currentAccount: account,
-                isAuthenticated: false,
-              })
+              // 刷新失败时，仅清理该账号的 token，保持当前登录状态不变
+              setAuthState(prev => ({
+                ...prev,
+                accounts: prev.accounts.map(acc =>
+                  acc.address === account.address
+                    ? { ...acc, token: undefined }
+                    : acc
+                ),
+              }))
               throw new Error("Token 已过期且刷新失败，请重新登录")
             }
           } else {
-            setAuthState({
-              ...authState,
-              token: null,
-              currentAccount: account,
-              isAuthenticated: false,
-            })
+            // 没有密码无法刷新 token，只清理该账号的 token
+            setAuthState(prev => ({
+              ...prev,
+              accounts: prev.accounts.map(acc =>
+                acc.address === account.address
+                  ? { ...acc, token: undefined }
+                  : acc
+              ),
+            }))
             throw new Error("Token 已过期，请重新登录")
           }
         }
-      } else if (account.password) {
-        // 没有token但有密码，在后台获取token
+      }
+
+      if (account.password) {
+        // 没有 token 但有密码，在后台获取新的 token
         try {
           console.log(`🔑 [Auth] Getting token for account: ${account.address}`)
-          const accountProviderId = account.providerId || "duckmail"
           const { token } = await getToken(account.address, account.password, accountProviderId)
           const updatedAccount = await getAccount(token, accountProviderId)
 
@@ -268,28 +359,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ...updatedAccount,
             password: account.password,
             token,
-            providerId: account.providerId || "duckmail",
+            providerId: accountProviderId,
           }
 
-          const updatedAccounts = authState.accounts.map((acc) =>
-            acc.address === account.address ? accountWithAuth : acc
-          )
-
           console.log(`✅ [Auth] Token obtained, switched to account: ${account.address}`)
-          setAuthState({
-            token,
-            currentAccount: accountWithAuth,
-            accounts: updatedAccounts,
-            isAuthenticated: true,
-          })
+          applyAccountWithAuth(accountWithAuth, token)
+          return
         } catch (error) {
           console.error(`❌ [Auth] Failed to get token for account: ${account.address}`)
           throw new Error("获取登录凭据失败，请重新登录")
         }
-      } else {
-        // 没有密码也没有token
-        console.warn(`⚠️ [Auth] No credentials available for account: ${account.address}`)
-        throw new Error("缺少登录凭据，请重新登录")
       }
     } catch (error) {
       console.error("❌ [Auth] Switch account failed:", error)

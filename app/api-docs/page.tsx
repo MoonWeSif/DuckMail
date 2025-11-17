@@ -562,7 +562,7 @@ export default function ApiDocsPage() {
               <div className="flex gap-3">
                 <Button
                   as="a"
-                  href="https://github.com/Syferie/DuckMail"
+                  href="https://github.com/moonwesif/DuckMail"
                   target="_blank"
                   rel="noopener noreferrer"
                   color="primary"
