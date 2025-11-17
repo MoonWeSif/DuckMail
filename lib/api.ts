@@ -1,6 +1,6 @@
 import type { Account, Domain, Message, MessageDetail } from "@/types"
 
-// 直接指向 DuckMail API 服务
+// 直接指向 DuckMail API 服务（默认提供商）
 const API_BASE_URL = "https://api.duckmail.sbs"
 
 // 获取默认API提供商配置（用于向后兼容）
@@ -8,9 +8,28 @@ function getDefaultProviderConfig() {
   return {
     id: "duckmail",
     name: "DuckMail",
-    baseUrl: "https://api.duckmail.sbs",
+    baseUrl: API_BASE_URL,
     mercureUrl: "https://mercure.duckmail.sbs/.well-known/mercure",
   }
+}
+
+// 根据 providerId 获取实际要使用的 API 基础地址
+function getApiBaseUrlForProvider(providerId?: string): string {
+  if (typeof window === "undefined") return API_BASE_URL
+
+  if (!providerId) {
+    const provider = getDefaultProviderConfig()
+    return provider.baseUrl || API_BASE_URL
+  }
+
+  const provider = getProviderConfig(providerId)
+  if (provider && provider.baseUrl) {
+    return provider.baseUrl
+  }
+
+  // 回退到默认提供商
+  const fallbackProvider = getDefaultProviderConfig()
+  return fallbackProvider.baseUrl || API_BASE_URL
 }
 
 // 创建带有提供商信息的请求头
@@ -360,14 +379,23 @@ export async function createAccount(address: string, password: string, providerI
     providerId = inferProviderFromEmail(address)
   }
 
-  console.log(`🔧 [API] Creating account ${address} with provider: ${providerId}`)
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  console.log(`🔧 [API] Creating account ${address} with provider: ${providerId}, baseUrl=${baseUrl}`)
+
+  const headers = createHeaders(
+    {
+      "Content-Type": "application/json",
+    },
+    providerId,
+    apiKey
+  )
 
   try {
-    const res = await fetch(`${API_BASE_URL}/accounts`, {
+    const res = await fetch(`${baseUrl}/accounts`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({ address, password }),
     })
 
@@ -400,11 +428,9 @@ export async function createAccount(address: string, password: string, providerI
 
     // 对于其他错误，使用重试逻辑
     const response = await retryFetch(async () => {
-      const res = await fetch(`${API_BASE_URL}/accounts`, {
+      const res = await fetch(`${baseUrl}/accounts`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ address, password }),
       })
 
@@ -426,12 +452,21 @@ export async function getToken(address: string, password: string, providerId?: s
     providerId = inferProviderFromEmail(address)
   }
 
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  const headers = createHeaders(
+    {
+      "Content-Type": "application/json",
+    },
+    providerId,
+    apiKey
+  )
+
   const response = await retryFetch(async () => {
-    const res = await fetch(`${API_BASE_URL}/token`, {
+    const res = await fetch(`${baseUrl}/token`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({ address, password }),
     })
 
@@ -451,11 +486,20 @@ export async function getMercureToken(token: string, providerId?: string): Promi
 }
 
 export async function getAccount(token: string, providerId?: string): Promise<Account> {
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  const headers = createHeaders(
+    {
+      Authorization: `Bearer ${token}`,
+    },
+    providerId,
+    apiKey
+  )
+
   const response = await retryFetch(async () => {
-    const res = await fetch(`${API_BASE_URL}/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await fetch(`${baseUrl}/me`, {
+      headers,
     })
 
     if (!res.ok) {
@@ -473,11 +517,20 @@ export async function getMessages(token: string, page = 1, providerId?: string):
   const timestamp = new Date().toISOString()
   console.log(`📡 [API] getMessages called at ${timestamp} - page: ${page}`)
 
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  const headers = createHeaders(
+    {
+      Authorization: `Bearer ${token}`,
+    },
+    providerId,
+    apiKey
+  )
+
   const response = await retryFetch(async () => {
-    const res = await fetch(`${API_BASE_URL}/messages?page=${page}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await fetch(`${baseUrl}/messages?page=${page}`, {
+      headers,
     })
 
     if (!res.ok) {
@@ -507,11 +560,20 @@ export async function getMessages(token: string, page = 1, providerId?: string):
 }
 
 export async function getMessage(token: string, id: string, providerId?: string): Promise<MessageDetail> {
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  const headers = createHeaders(
+    {
+      Authorization: `Bearer ${token}`,
+    },
+    providerId,
+    apiKey
+  )
+
   const response = await retryFetch(async () => {
-    const res = await fetch(`${API_BASE_URL}/messages/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await fetch(`${baseUrl}/messages/${id}`, {
+      headers,
     })
 
     if (!res.ok) {
@@ -526,13 +588,22 @@ export async function getMessage(token: string, id: string, providerId?: string)
 }
 
 export async function markMessageAsRead(token: string, id: string, providerId?: string): Promise<{ seen: boolean }> {
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  const headers = createHeaders(
+    {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/merge-patch+json",
+    },
+    providerId,
+    apiKey
+  )
+
   const response = await retryFetch(async () => {
-    const res = await fetch(`${API_BASE_URL}/messages/${id}`, {
+    const res = await fetch(`${baseUrl}/messages/${id}`, {
       method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/merge-patch+json",
-      },
+      headers,
       body: JSON.stringify({ seen: true }), // 需要发送请求体来标记为已读
     })
 
@@ -553,12 +624,21 @@ export async function markMessageAsRead(token: string, id: string, providerId?: 
 }
 
 export async function deleteMessage(token: string, id: string, providerId?: string): Promise<void> {
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  const headers = createHeaders(
+    {
+      Authorization: `Bearer ${token}`,
+    },
+    providerId,
+    apiKey
+  )
+
   await retryFetch(async () => {
-    const res = await fetch(`${API_BASE_URL}/messages/${id}`, {
+    const res = await fetch(`${baseUrl}/messages/${id}`, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
     })
 
     if (!res.ok) {
@@ -571,12 +651,21 @@ export async function deleteMessage(token: string, id: string, providerId?: stri
 }
 
 export async function deleteAccount(token: string, id: string, providerId?: string): Promise<void> {
+  const apiKey = getApiKey()
+  const baseUrl = getApiBaseUrlForProvider(providerId)
+
+  const headers = createHeaders(
+    {
+      Authorization: `Bearer ${token}`,
+    },
+    providerId,
+    apiKey
+  )
+
   await retryFetch(async () => {
-    const res = await fetch(`${API_BASE_URL}/accounts/${id}`, {
+    const res = await fetch(`${baseUrl}/accounts/${id}`, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
     })
 
     if (!res.ok) {
