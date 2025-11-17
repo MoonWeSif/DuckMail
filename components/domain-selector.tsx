@@ -62,11 +62,16 @@ export function DomainSelector({ value, onSelectionChange, currentLocale, isDisa
                 providerName: provider.name,
               }))
 
-              // 立即更新域名列表（使用函数式更新并去重）
+              // 立即更新域名列表（使用函数式更新并去重：按 providerId + domain 去重）
               setDomains(prevDomains => {
-                // 合并新域名，并根据域名去重
-                const existingDomainNames = new Set(prevDomains.map(d => d.domain))
-                const uniqueNewDomains = domainsWithProvider.filter(d => !existingDomainNames.has(d.domain))
+                // 合并新域名，并根据 providerId + domain 去重
+                const existingKeys = new Set(
+                  prevDomains.map(d => `${d.providerId || "duckmail"}:${d.domain}`)
+                )
+                const uniqueNewDomains = domainsWithProvider.filter(d => {
+                  const key = `${d.providerId || "duckmail"}:${d.domain}`
+                  return !existingKeys.has(key)
+                })
                 const newDomains = [...prevDomains, ...uniqueNewDomains]
 
                 // 缓存当前结果
@@ -135,11 +140,11 @@ export function DomainSelector({ value, onSelectionChange, currentLocale, isDisa
 
   // 按提供商分组域名
   const domainsByProvider = domains.reduce((acc, domain) => {
-    const providerId = domain.providerId || "unknown"
+    const providerId = domain.providerId || "duckmail"
     if (!acc[providerId]) {
       acc[providerId] = {
         providerName: domain.providerName || providerId,
-        domains: []
+        domains: [],
       }
     }
     acc[providerId].domains.push(domain)

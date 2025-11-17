@@ -243,14 +243,19 @@ export async function fetchDomainsFromProvider(providerId: string): Promise<Doma
     const apiKey = getApiKey()
     console.log(`🔑 [API] fetchDomainsFromProvider - providerId: ${providerId}, apiKey: ${apiKey ? `${apiKey.substring(0, 10)}...` : 'null'}`)
 
-    const headers = createHeaders({
-      "Cache-Control": "no-cache",
-    }, providerId, apiKey)
+    const baseUrl = getApiBaseUrlForProvider(providerId)
+    const headers = createHeaders(
+      {
+        "Cache-Control": "no-cache",
+      },
+      providerId,
+      apiKey,
+    )
 
-    console.log(`📤 [API] Request headers:`, headers)
+    console.log(`📤 [API] fetchDomainsFromProvider baseUrl=${baseUrl} headers=`, headers)
 
     const response = await retryFetch(async () => {
-      const url = `${API_BASE_URL}/domains`
+      const url = `${baseUrl}/domains`
       console.log(`📤 [API] Making request to: ${url}`)
       console.log(`📤 [API] Request headers:`, JSON.stringify(headers, null, 2))
 
