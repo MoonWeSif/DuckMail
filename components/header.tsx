@@ -140,7 +140,7 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                     {isEnabled ? "邮件自动检查已开启" : "邮件自动检查已关闭"}
                   </p>
                   <p className="text-xs text-gray-600">
-                    {isEnabled ? "当前每 1 秒轮询一次收件箱" : "不会自动轮询，可手动点击刷新按钮查看新邮件"}
+                    {isEnabled ? "当前每 2 秒轮询一次收件箱" : "不会自动轮询，可手动点击刷新按钮查看新邮件"}
                   </p>
                 </div>
               </TooltipContent>

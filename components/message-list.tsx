@@ -68,11 +68,11 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     }
   }, [token, currentAccount, currentLocale])
 
-  // 使用简单轮询方案：每 1 秒检查一次新邮件
+  // 使用简单轮询方案：每 2 秒检查一次新邮件
   useMailChecker({
     onNewMessage: handleNewMessage,
     onMessagesUpdate: handleMessagesUpdate,
-    interval: 1000,
+    interval: 2000,
     enabled: isEnabled,
   })
 
@@ -195,7 +195,7 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
             {isEnabled
               ? currentLocale === "en"
                 ? "🔄 Polling for new messages (1s interval)"
-                : "🔄 正在轮询新邮件（1秒间隔）"
+                : "🔄 正在轮询新邮件（2秒间隔）"
               : currentLocale === "en"
                 ? "⏸ Polling paused"
                 : "⏸ 轮询已暂停"}
