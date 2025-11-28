@@ -15,20 +15,40 @@ import { MailStatusProvider } from "@/contexts/mail-status-context"
 import type { Message } from "@/types"
 import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { Languages, CheckCircle, Navigation, RefreshCw, Menu } from "lucide-react"
+import { Languages, CheckCircle, Navigation, RefreshCw, Menu, AlertCircle } from "lucide-react"
 import { Button } from "@heroui/button"
+
+// 生成随机字符串，用于用户名和密码
+function generateRandomString(length: number) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+  const charsLength = chars.length
+
+  if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
+    const array = new Uint32Array(length)
+    window.crypto.getRandomValues(array)
+    return Array.from(array, (value) => chars[value % charsLength]).join("")
+  }
+
+  let result = ""
+  for (let i = 0; i < length; i++) {
+    const index = Math.floor(Math.random() * charsLength)
+    result += chars[index]
+  }
+  return result
+}
 
 function MainContent() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [loginAccountAddress, setLoginAccountAddress] = useState<string>("")
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
-  const { isAuthenticated, currentAccount } = useAuth()
+  const { isAuthenticated, currentAccount, accounts, register } = useAuth()
   const [currentLocale, setCurrentLocale] = useState("zh")
   const [refreshKey, setRefreshKey] = useState(0)
   const { toast } = useHeroUIToast()
   const isMobile = useIsMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [autoAccountHandled, setAutoAccountHandled] = useState(false)
 
   // 检测浏览器语言并设置默认语言
   useEffect(() => {
@@ -57,6 +77,101 @@ function MainContent() {
   useEffect(() => {
     document.documentElement.lang = currentLocale === "en" ? "en" : "zh-CN"
   }, [currentLocale])
+
+  // 首次访问时自动创建临时邮箱并登录
+  useEffect(() => {
+    if (autoAccountHandled) return
+    if (typeof window === "undefined") return
+
+    // 如果本地已经有 auth 记录（说明之前登录/使用过），则不再自动创建
+    try {
+      const savedAuth = localStorage.getItem("auth")
+      if (savedAuth) {
+        const parsed = JSON.parse(savedAuth)
+        if (parsed?.accounts && Array.isArray(parsed.accounts) && parsed.accounts.length > 0) {
+          setAutoAccountHandled(true)
+          return
+        }
+      }
+    } catch (error) {
+      console.error("Failed to parse saved auth from localStorage:", error)
+    }
+
+    // 当前会话里已经有账号或处于登录状态，也不需要自动创建
+    if (isAuthenticated || currentAccount || (accounts && accounts.length > 0)) {
+      setAutoAccountHandled(true)
+      return
+    }
+
+    // 如果用户禁用了 DuckMail 提供商，则不自动创建，避免违背用户高级设置
+    try {
+      const disabledProviders = JSON.parse(localStorage.getItem("disabled-api-providers") || "[]")
+      if (Array.isArray(disabledProviders) && disabledProviders.includes("duckmail")) {
+        setAutoAccountHandled(true)
+        return
+      }
+    } catch (error) {
+      console.error("Failed to read disabled providers from localStorage:", error)
+    }
+
+    setAutoAccountHandled(true)
+
+    const createTemporaryAccount = async () => {
+      const maxAttempts = 5
+      const domain = "duckmail.sbs"
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const username = generateRandomString(10)
+        const password = generateRandomString(12)
+        const email = `${username}@${domain}`
+
+        try {
+          await register(email, password)
+
+          const isZh = currentLocale !== "en"
+          toast({
+            title: isZh ? "已为你创建临时邮箱" : "Temporary email created",
+            description: isZh
+              ? `地址：${email}\n密码：${password}（请妥善保管，此为临时账号，密码无法找回）`
+              : `Address: ${email}\nPassword: ${password} (Please keep it safe. This is a temporary account and the password cannot be recovered.)`,
+            color: "success",
+            variant: "flat",
+            icon: <CheckCircle size={16} />
+          })
+          return
+        } catch (error: any) {
+          const message = error?.message || ""
+          const isAddressTaken =
+            message.includes("该邮箱地址已被使用") ||
+            message.includes("Email address already exists") ||
+            message.includes("already used") ||
+            message.includes("already exists")
+
+          // 如果只是地址重复，换一个用户名继续重试
+          if (isAddressTaken && attempt < maxAttempts - 1) {
+            continue
+          }
+
+          const isZh = currentLocale !== "en"
+          console.error("自动创建临时邮箱失败:", error)
+          toast({
+            title: isZh ? "自动创建临时邮箱失败" : "Failed to create temporary email",
+            description:
+              message ||
+              (isZh
+                ? "请稍后重试，或者手动创建一个邮箱账号。"
+                : "Please try again later or create an account manually."),
+            color: "danger",
+            variant: "flat",
+            icon: <AlertCircle size={16} />
+          })
+          break
+        }
+      }
+    }
+
+    createTemporaryAccount()
+  }, [autoAccountHandled, isAuthenticated, currentAccount, accounts, register, toast, currentLocale])
 
   const handleLocaleChange = (locale: string) => {
     setCurrentLocale(locale)
