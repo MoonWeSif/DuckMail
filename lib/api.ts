@@ -398,58 +398,19 @@ export async function createAccount(address: string, password: string, providerI
     apiKey
   )
 
-  try {
-    const res = await fetch(`${baseUrl}/accounts`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ address, password }),
-    })
+  const res = await fetch(`${baseUrl}/accounts`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ address, password }),
+  })
 
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}))
-      const errorMessage = getErrorMessage(res.status, error)
-
-      // 对于422和429错误，直接抛出，不重试
-      if (res.status === 422 || res.status === 429) {
-        throw new Error(errorMessage)
-      }
-
-      // 对于其他错误，可以考虑重试
-      throw new Error(`HTTP ${res.status}: ${errorMessage}`)
-    }
-
-    return res.json()
-  } catch (error: any) {
-    // 如果是422或429错误，直接抛出
-    if (error.message && (
-      error.message.includes("该邮箱地址已被使用") ||
-      error.message.includes("请求过于频繁") ||
-      error.message.includes("Email address already exists") ||
-      error.message.includes("rate limit") ||
-      error.message.includes("422") ||
-      error.message.includes("429")
-    )) {
-      throw error
-    }
-
-    // 对于其他错误，使用重试逻辑
-    const response = await retryFetch(async () => {
-      const res = await fetch(`${baseUrl}/accounts`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ address, password }),
-      })
-
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({}))
-        throw new Error(`HTTP ${res.status}: ${getErrorMessage(res.status, error)}`)
-      }
-
-      return res
-    }, 2, 2000) // 减少重试次数和增加延迟
-
-    return response.json()
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    const errorMessage = getErrorMessage(res.status, error)
+    throw new Error(errorMessage)
   }
+
+  return res.json()
 }
 
 export async function getToken(address: string, password: string, providerId?: string): Promise<{ token: string; id: string }> {
@@ -469,22 +430,18 @@ export async function getToken(address: string, password: string, providerId?: s
     apiKey
   )
 
-  const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/token`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ address, password }),
-    })
-
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}))
-      throw new Error(getErrorMessage(res.status, error))
-    }
-
-    return res
+  const res = await fetch(`${baseUrl}/token`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ address, password }),
   })
 
-  return response.json()
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(getErrorMessage(res.status, error))
+  }
+
+  return res.json()
 }
 export async function getMercureToken(token: string, providerId?: string): Promise<{ token: string }> {
   // Mercure 已弃用，保持兼容但直接抛出错误
