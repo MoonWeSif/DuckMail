@@ -44,7 +44,14 @@ function createHeaders(additionalHeaders: HeadersInit = {}, providerId?: string,
     headers["X-API-Provider-Base-URL"] = provider.baseUrl
   }
 
-  // 如果提供了 API Key，添加 Authorization 头
+  // 如果已经有 Authorization 头（如传入的 JWT token），不要用 API Key 覆盖
+  const existingAuth = (additionalHeaders as Record<string, string>)["Authorization"]
+  if (existingAuth) {
+    console.log(`🔑 [API] Using existing Authorization header (JWT token)`)
+    return headers
+  }
+
+  // 只有在没有 Authorization 头时，才使用 API Key
   if (apiKey && apiKey.trim()) {
     const trimmedApiKey = apiKey.trim()
     console.log(`🔑 [API] Processing API Key: ${trimmedApiKey.substring(0, 10)}..., length: ${trimmedApiKey.length}`)
