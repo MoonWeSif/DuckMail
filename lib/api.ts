@@ -32,44 +32,48 @@ function getApiBaseUrlForProvider(providerId?: string): string {
   return fallbackProvider.baseUrl || API_BASE_URL
 }
 
-// 创建带有提供商信息的请求头
-function createHeaders(additionalHeaders: HeadersInit = {}, providerId?: string, apiKey?: string): HeadersInit {
-  // 如果指定了providerId，使用指定的提供商，否则使用默认提供商
+// 创建带有提供商信息的请求头（不带认证）
+function createBaseHeaders(providerId?: string): Record<string, string> {
   const provider = providerId ? getProviderConfig(providerId) : getDefaultProviderConfig()
-  const headers: Record<string, string> = {
-    ...additionalHeaders as Record<string, string>,
-  }
+  const headers: Record<string, string> = {}
 
   if (provider) {
     headers["X-API-Provider-Base-URL"] = provider.baseUrl
   }
 
-  // 如果已经有 Authorization 头（如传入的 JWT token），不要用 API Key 覆盖
-  const existingAuth = (additionalHeaders as Record<string, string>)["Authorization"]
-  if (existingAuth) {
-    console.log(`🔑 [API] Using existing Authorization header (JWT token)`)
-    return headers
+  return headers
+}
+
+// 创建带有 API Key 认证的请求头（仅用于 fetchDomains 和 createAccount）
+function createHeadersWithApiKey(additionalHeaders: Record<string, string> = {}, providerId?: string): HeadersInit {
+  const headers = {
+    ...createBaseHeaders(providerId),
+    ...additionalHeaders,
   }
 
-  // 只有在没有 Authorization 头时，才使用 API Key
+  const apiKey = getApiKey()
   if (apiKey && apiKey.trim()) {
     const trimmedApiKey = apiKey.trim()
-    console.log(`🔑 [API] Processing API Key: ${trimmedApiKey.substring(0, 10)}..., length: ${trimmedApiKey.length}`)
+    console.log(`🔑 [API] Using API Key for domain/account operation: ${trimmedApiKey.substring(0, 10)}...`)
 
-    // 根据后端API文档，支持 Bearer 格式和直接格式
     if (trimmedApiKey.startsWith('Bearer ')) {
       headers["Authorization"] = trimmedApiKey
-      console.log(`🔑 [API] Using Bearer format as-is`)
     } else if (trimmedApiKey.startsWith('dk_')) {
       headers["Authorization"] = `Bearer ${trimmedApiKey}`
-      console.log(`🔑 [API] Adding Bearer prefix to dk_ key`)
     } else {
       headers["Authorization"] = `Bearer ${trimmedApiKey}`
-      console.log(`🔑 [API] Adding Bearer prefix to unknown format key`)
     }
-    console.log(`🔑 [API] Final Authorization header: ${headers["Authorization"].substring(0, 25)}...`)
-  } else {
-    console.log(`🔑 [API] No API Key provided, skipping Authorization header`)
+  }
+
+  return headers
+}
+
+// 创建带有 JWT Token 认证的请求头（用于其他所有需要认证的操作）
+function createHeadersWithToken(token: string, additionalHeaders: Record<string, string> = {}, providerId?: string): HeadersInit {
+  const headers = {
+    ...createBaseHeaders(providerId),
+    ...additionalHeaders,
+    Authorization: `Bearer ${token}`,
   }
 
   return headers
@@ -244,34 +248,20 @@ async function retryFetch(fn: () => Promise<any>, retries = 3, delay = 1000): Pr
   }
 }
 
-// 获取单个提供商的域名
+// 获取单个提供商的域名（需要 API Key 来获取私有域名）
 export async function fetchDomainsFromProvider(providerId: string): Promise<Domain[]> {
   try {
-    const apiKey = getApiKey()
-    console.log(`🔑 [API] fetchDomainsFromProvider - providerId: ${providerId}, apiKey: ${apiKey ? `${apiKey.substring(0, 10)}...` : 'null'}`)
-
     const baseUrl = getApiBaseUrlForProvider(providerId)
-    const headers = createHeaders(
-      {
-        "Cache-Control": "no-cache",
-      },
-      providerId,
-      apiKey,
-    )
+    // 使用 API Key 认证，以便获取用户私有域名
+    const headers = createHeadersWithApiKey({ "Cache-Control": "no-cache" }, providerId)
 
-    console.log(`📤 [API] fetchDomainsFromProvider baseUrl=${baseUrl} headers=`, headers)
+    console.log(`📤 [API] fetchDomainsFromProvider baseUrl=${baseUrl}`)
 
     const response = await retryFetch(async () => {
       const url = `${baseUrl}/domains`
-      console.log(`📤 [API] Making request to: ${url}`)
-      console.log(`📤 [API] Request headers:`, JSON.stringify(headers, null, 2))
-
-      const res = await fetch(url, {
-        headers,
-      })
+      const res = await fetch(url, { headers })
 
       console.log(`📥 [API] Response status: ${res.status}`)
-      console.log(`📥 [API] Response headers:`, Object.fromEntries(res.headers.entries()))
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`)
@@ -386,24 +376,18 @@ export async function fetchDomains(): Promise<Domain[]> {
   return fetchAllDomains()
 }
 
+// 创建账户（需要 API Key 来在私有域名下创建账户）
 export async function createAccount(address: string, password: string, providerId?: string): Promise<Account> {
   // 如果没有指定providerId，尝试从邮箱地址推断
   if (!providerId) {
     providerId = inferProviderFromEmail(address)
   }
 
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
+  console.log(`🔧 [API] Creating account ${address} with provider: ${providerId}`)
 
-  console.log(`🔧 [API] Creating account ${address} with provider: ${providerId}, baseUrl=${baseUrl}`)
-
-  const headers = createHeaders(
-    {
-      "Content-Type": "application/json",
-    },
-    providerId,
-    apiKey
-  )
+  // 使用 API Key 认证，以便在私有域名下创建账户
+  const headers = createHeadersWithApiKey({ "Content-Type": "application/json" }, providerId)
 
   const res = await fetch(`${baseUrl}/accounts`, {
     method: "POST",
@@ -420,22 +404,18 @@ export async function createAccount(address: string, password: string, providerI
   return res.json()
 }
 
+// 登录获取 JWT Token（不需要 API Key）
 export async function getToken(address: string, password: string, providerId?: string): Promise<{ token: string; id: string }> {
   // 如果没有指定providerId，尝试从邮箱地址推断
   if (!providerId) {
     providerId = inferProviderFromEmail(address)
   }
 
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
-
-  const headers = createHeaders(
-    {
-      "Content-Type": "application/json",
-    },
-    providerId,
-    apiKey
-  )
+  const headers = {
+    ...createBaseHeaders(providerId),
+    "Content-Type": "application/json",
+  }
 
   const res = await fetch(`${baseUrl}/token`, {
     method: "POST",
@@ -455,22 +435,13 @@ export async function getMercureToken(token: string, providerId?: string): Promi
   throw new Error("Mercure is no longer supported. Please use polling on /messages instead.")
 }
 
+// 获取账户信息（只需要 JWT Token）
 export async function getAccount(token: string, providerId?: string): Promise<Account> {
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
-
-  const headers = createHeaders(
-    {
-      Authorization: `Bearer ${token}`,
-    },
-    providerId,
-    apiKey
-  )
+  const headers = createHeadersWithToken(token, {}, providerId)
 
   const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/me`, {
-      headers,
-    })
+    const res = await fetch(`${baseUrl}/me`, { headers })
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}))
@@ -483,25 +454,13 @@ export async function getAccount(token: string, providerId?: string): Promise<Ac
   return response.json()
 }
 
+// 获取消息列表（只需要 JWT Token）
 export async function getMessages(token: string, page = 1, providerId?: string): Promise<{ messages: Message[]; total: number; hasMore: boolean }> {
-  const timestamp = new Date().toISOString()
-  console.log(`📡 [API] getMessages called at ${timestamp} - page: ${page}`)
-
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
-
-  const headers = createHeaders(
-    {
-      Authorization: `Bearer ${token}`,
-    },
-    providerId,
-    apiKey
-  )
+  const headers = createHeadersWithToken(token, {}, providerId)
 
   const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/messages?page=${page}`, {
-      headers,
-    })
+    const res = await fetch(`${baseUrl}/messages?page=${page}`, { headers })
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}))
@@ -509,7 +468,6 @@ export async function getMessages(token: string, page = 1, providerId?: string):
       throw new Error(getErrorMessage(res.status, error))
     }
 
-    console.log(`✅ [API] getMessages success - Status: ${res.status}`)
     return res
   })
 
@@ -520,8 +478,6 @@ export async function getMessages(token: string, page = 1, providerId?: string):
   // 根据API文档，每页最多30条消息
   const hasMore = messages.length === 30 && (page * 30) < total
 
-  console.log(`📊 [API] getMessages result - Messages: ${messages.length}, Total: ${total}, HasMore: ${hasMore}`)
-
   return {
     messages,
     total,
@@ -529,22 +485,13 @@ export async function getMessages(token: string, page = 1, providerId?: string):
   }
 }
 
+// 获取单条消息详情（只需要 JWT Token）
 export async function getMessage(token: string, id: string, providerId?: string): Promise<MessageDetail> {
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
-
-  const headers = createHeaders(
-    {
-      Authorization: `Bearer ${token}`,
-    },
-    providerId,
-    apiKey
-  )
+  const headers = createHeadersWithToken(token, {}, providerId)
 
   const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/messages/${id}`, {
-      headers,
-    })
+    const res = await fetch(`${baseUrl}/messages/${id}`, { headers })
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}))
@@ -557,24 +504,16 @@ export async function getMessage(token: string, id: string, providerId?: string)
   return response.json()
 }
 
+// 标记消息为已读（只需要 JWT Token）
 export async function markMessageAsRead(token: string, id: string, providerId?: string): Promise<{ seen: boolean }> {
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
-
-  const headers = createHeaders(
-    {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/merge-patch+json",
-    },
-    providerId,
-    apiKey
-  )
+  const headers = createHeadersWithToken(token, { "Content-Type": "application/merge-patch+json" }, providerId)
 
   const response = await retryFetch(async () => {
     const res = await fetch(`${baseUrl}/messages/${id}`, {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ seen: true }), // 需要发送请求体来标记为已读
+      body: JSON.stringify({ seen: true }),
     })
 
     if (!res.ok) {
@@ -582,28 +521,19 @@ export async function markMessageAsRead(token: string, id: string, providerId?: 
       throw new Error(getErrorMessage(res.status, error))
     }
 
-    // API文档显示成功时返回 {"seen": true}
     if (res.headers.get("content-type")?.includes("application/json")) {
       return res.json()
     }
-    // 如果状态码是200，假设操作成功
     return { seen: true }
   })
 
   return response
 }
 
+// 删除消息（只需要 JWT Token）
 export async function deleteMessage(token: string, id: string, providerId?: string): Promise<void> {
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
-
-  const headers = createHeaders(
-    {
-      Authorization: `Bearer ${token}`,
-    },
-    providerId,
-    apiKey
-  )
+  const headers = createHeadersWithToken(token, {}, providerId)
 
   await retryFetch(async () => {
     const res = await fetch(`${baseUrl}/messages/${id}`, {
@@ -620,17 +550,10 @@ export async function deleteMessage(token: string, id: string, providerId?: stri
   })
 }
 
+// 删除账户（只需要 JWT Token）
 export async function deleteAccount(token: string, id: string, providerId?: string): Promise<void> {
-  const apiKey = getApiKey()
   const baseUrl = getApiBaseUrlForProvider(providerId)
-
-  const headers = createHeaders(
-    {
-      Authorization: `Bearer ${token}`,
-    },
-    providerId,
-    apiKey
-  )
+  const headers = createHeadersWithToken(token, {}, providerId)
 
   await retryFetch(async () => {
     const res = await fetch(`${baseUrl}/accounts/${id}`, {
