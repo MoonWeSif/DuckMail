@@ -221,14 +221,10 @@ export function DomainSelector({ value, onSelectionChange, currentLocale, isDisa
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                {(domain.isPrivate || (!domain.isPublic && domain.isPublic !== undefined)) && (
+                {/* 用户私有域名标识：有 ownerId 的是用户域名 */}
+                {domain.ownerId && (
                   <div className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 rounded-full text-xs font-medium">
                     {isZh ? "私有" : "Private"}
-                  </div>
-                )}
-                {!domain.isActive && (
-                  <div className="px-2 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full text-xs font-medium">
-                    {isZh ? "不可用" : "Inactive"}
                   </div>
                 )}
               </div>

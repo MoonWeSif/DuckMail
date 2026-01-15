@@ -281,17 +281,11 @@ export async function fetchDomainsFromProvider(providerId: string): Promise<Doma
         availableDomains = data["hydra:member"].filter((domain: any) => {
           // 必须已验证才能使用
           if (!domain.isVerified) {
-            console.log(`🚫 [API] [DuckMail] Filtering out unverified domain: ${domain.domainName}`)
+            console.log(`🚫 [API] [DuckMail] Filtering out unverified domain: ${domain.domain}`)
             return false
           }
 
-          // 必须是活跃状态
-          if (!domain.isActive) {
-            console.log(`🚫 [API] [DuckMail] Filtering out inactive domain: ${domain.domainName}`)
-            return false
-          }
-
-          console.log(`✅ [API] [DuckMail] Including available domain: ${domain.domainName} (public: ${domain.isPublic}, verified: ${domain.isVerified})`)
+          console.log(`✅ [API] [DuckMail] Including available domain: ${domain.domain} (verified: ${domain.isVerified})`)
           return true
         })
       } else {
@@ -299,24 +293,11 @@ export async function fetchDomainsFromProvider(providerId: string): Promise<Doma
         console.log(`✅ [API] [${providerId}] Using all domains without filtering (${availableDomains.length} domains)`)
       }
 
-      // 为每个域名添加提供商信息，并标准化字段名
-      return availableDomains.map((domain: any) => {
-        const standardizedDomain: any = {
-          ...domain,
-          providerId, // 添加提供商ID
-        }
-
-        // 只对 DuckMail 提供商进行字段标准化
-        if (providerId === "duckmail") {
-          standardizedDomain.domain = domain.domainName || domain.domain // 标准化域名字段
-          standardizedDomain.isPrivate = domain.isPrivate || (!domain.isPublic && domain.isPublic !== undefined) // 标准化私有字段
-        } else {
-          // 其他提供商保持原有字段结构
-          standardizedDomain.domain = domain.domain || domain.domainName
-        }
-
-        return standardizedDomain
-      })
+      // 为每个域名添加提供商信息
+      return availableDomains.map((domain: any) => ({
+        ...domain,
+        providerId, // 添加提供商ID
+      }))
     } else {
       console.error("Invalid domains data format:", data)
       return []
