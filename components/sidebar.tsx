@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/button"
 import { Card } from "@heroui/card"
-import { Mail, RefreshCw, Code, HelpCircle, MessageSquare, ExternalLink } from "lucide-react"
+import { Mail, RefreshCw, Code, HelpCircle, MessageSquare, ExternalLink, Bell } from "lucide-react"
 
 interface SidebarProps {
   activeItem: string
@@ -26,6 +26,11 @@ export default function Sidebar({ activeItem, onItemClick, currentLocale, isMobi
   ]
 
   const bottomItems = [
+    {
+      id: "update-notice",
+      label: currentLocale === "en" ? "Updates" : "更新通知",
+      icon: Bell
+    },
     {
       id: "api",
       label: currentLocale === "en" ? "API" : "API 文档",
