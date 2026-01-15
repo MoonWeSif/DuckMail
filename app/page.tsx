@@ -8,6 +8,8 @@ import EmptyState from "@/components/empty-state"
 import FeatureCards from "@/components/feature-cards"
 import AccountModal from "@/components/account-modal"
 import LoginModal from "@/components/login-modal"
+import AccountInfoBanner from "@/components/account-info-banner"
+import UpdateNoticeModal from "@/components/update-notice-modal"
 import MessageList from "@/components/message-list"
 import MessageDetail from "@/components/message-detail"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
@@ -49,6 +51,9 @@ function MainContent() {
   const isMobile = useIsMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [autoAccountHandled, setAutoAccountHandled] = useState(false)
+  const [showAccountBanner, setShowAccountBanner] = useState(false)
+  const [createdAccountInfo, setCreatedAccountInfo] = useState<{ email: string; password: string } | null>(null)
+  const [isUpdateNoticeModalOpen, setIsUpdateNoticeModalOpen] = useState(false)
 
   // 检测浏览器语言并设置默认语言
   useEffect(() => {
@@ -77,6 +82,21 @@ function MainContent() {
   useEffect(() => {
     document.documentElement.lang = currentLocale === "en" ? "en" : "zh-CN"
   }, [currentLocale])
+
+  // 检查是否需要显示更新通知（仅显示一次）
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const noticeShown = localStorage.getItem("duckmail-update-notice-2026-01-16")
+    if (!noticeShown) {
+      // 延迟显示，避免和其他弹窗冲突
+      const timer = setTimeout(() => {
+        setIsUpdateNoticeModalOpen(true)
+        localStorage.setItem("duckmail-update-notice-2026-01-16", "true")
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [])
 
   // 首次访问时自动创建临时邮箱并登录
   useEffect(() => {
@@ -128,16 +148,19 @@ function MainContent() {
         try {
           await register(email, password)
 
+          // 显示 Toast 简短提示
           const isZh = currentLocale !== "en"
           toast({
             title: isZh ? "已为你创建临时邮箱" : "Temporary email created",
-            description: isZh
-              ? `地址：${email}\n密码：${password}（请妥善保管，此为临时账号，密码无法找回）`
-              : `Address: ${email}\nPassword: ${password} (Please keep it safe. This is a temporary account and the password cannot be recovered.)`,
+            description: isZh ? "请在顶部横幅中查看并保存账户信息" : "Check and save your account info in the banner above",
             color: "success",
             variant: "flat",
             icon: <CheckCircle size={16} />
           })
+
+          // 显示顶部 Banner 展示详细信息
+          setCreatedAccountInfo({ email, password })
+          setShowAccountBanner(true)
           return
         } catch (error: any) {
           const message = error?.message || ""
@@ -241,6 +264,11 @@ function MainContent() {
       return
     }
 
+    if (item === "update-notice") {
+      setIsUpdateNoticeModalOpen(true)
+      return
+    }
+
     if (item === "github" || item === "faq") {
       // 跳转到GitHub仓库（FAQ也跳转到GitHub）
       window.open("https://github.com/moonwesif/DuckMail", "_blank", "noopener,noreferrer")
@@ -312,6 +340,18 @@ function MainContent() {
             onLocaleChange={handleLocaleChange}
             isMobile={isMobile}
           />
+          {/* 账户信息横幅 - 自动创建账户后显示 */}
+          {showAccountBanner && createdAccountInfo && (
+            <AccountInfoBanner
+              email={createdAccountInfo.email}
+              password={createdAccountInfo.password}
+              currentLocale={currentLocale}
+              onClose={() => {
+                setShowAccountBanner(false)
+                setCreatedAccountInfo(null)
+              }}
+            />
+          )}
           <main className="flex-1 overflow-y-auto">
             <div className="h-full flex flex-col">
               <div className="flex-1">
@@ -384,6 +424,11 @@ function MainContent() {
         isOpen={isLoginModalOpen}
         onClose={handleCloseLoginModal}
         accountAddress={loginAccountAddress}
+        currentLocale={currentLocale}
+      />
+      <UpdateNoticeModal
+        isOpen={isUpdateNoticeModalOpen}
+        onClose={() => setIsUpdateNoticeModalOpen(false)}
         currentLocale={currentLocale}
       />
     </>
