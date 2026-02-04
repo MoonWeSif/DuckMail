@@ -81,6 +81,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // 监听token刷新事件，同步更新React state
+  useEffect(() => {
+    const handleTokenRefreshed = (event: CustomEvent<{ token: string }>) => {
+      const newToken = event.detail.token
+      console.log("🔄 [Auth] Token refreshed event received, updating React state")
+
+      setAuthState(prev => {
+        if (!prev.currentAccount) return prev
+
+        const updatedCurrentAccount = {
+          ...prev.currentAccount,
+          token: newToken,
+        }
+
+        const updatedAccounts = prev.accounts.map(acc =>
+          acc.address === prev.currentAccount?.address
+            ? { ...acc, token: newToken }
+            : acc
+        )
+
+        return {
+          ...prev,
+          token: newToken,
+          currentAccount: updatedCurrentAccount,
+          accounts: updatedAccounts,
+        }
+      })
+    }
+
+    window.addEventListener("token-refreshed", handleTokenRefreshed as EventListener)
+    return () => {
+      window.removeEventListener("token-refreshed", handleTokenRefreshed as EventListener)
+    }
+  }, [])
+
   useEffect(() => {
     // 保存认证状态到本地存储
     // 始终保存状态，包括所有账户信息，即使当前没有活跃的token

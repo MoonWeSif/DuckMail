@@ -173,25 +173,28 @@ function getProviderConfig(providerId: string) {
 
 // 根据API文档改进错误处理
 function getErrorMessage(status: number, errorData: any): string {
+  // 前缀添加HTTP状态码，便于retryFetch识别
+  const prefix = `HTTP ${status}: `
+
   switch (status) {
     case 400:
-      return "请求参数错误或缺失必要信息"
+      return prefix + "请求参数错误或缺失必要信息"
     case 401:
-      return "认证失败，请检查登录状态"
+      return prefix + "认证失败，请检查登录状态"
     case 404:
-      return "请求的资源不存在"
+      return prefix + "请求的资源不存在"
     case 405:
-      return "请求方法不被允许"
+      return prefix + "请求方法不被允许"
     case 418:
-      return "服务器暂时不可用"
+      return prefix + "服务器暂时不可用"
     case 422:
       // 处理具体的422错误信息
       if (errorData?.violations && Array.isArray(errorData.violations)) {
         const violation = errorData.violations[0]
         if (violation?.propertyPath === "address" && violation?.message?.includes("already used")) {
-          return "该邮箱地址已被使用，请尝试其他用户名"
+          return prefix + "该邮箱地址已被使用，请尝试其他用户名"
         }
-        return violation?.message || "请求数据格式错误"
+        return prefix + (violation?.message || "请求数据格式错误")
       }
 
       // 处理不同API提供商的错误消息格式
@@ -201,22 +204,165 @@ function getErrorMessage(status: number, errorData: any): string {
       if (errorMessage.includes("Email address already exists") ||
           errorMessage.includes("already used") ||
           errorMessage.includes("already exists")) {
-        return "该邮箱地址已被使用，请尝试其他用户名"
+        return prefix + "该邮箱地址已被使用，请尝试其他用户名"
       }
 
-      return errorMessage || "请求数据格式错误，请检查用户名长度或域名格式"
+      return prefix + (errorMessage || "请求数据格式错误，请检查用户名长度或域名格式")
     case 429:
-      return "请求过于频繁，请稍后再试"
+      return prefix + "请求过于频繁，请稍后再试"
     default:
-      return errorData?.message || errorData?.details || errorData?.error || `请求失败 (${status})`
+      return prefix + (errorData?.message || errorData?.details || errorData?.error || `请求失败`)
   }
 }
 
 // 检查是否应该重试的错误
 function shouldRetry(status: number): boolean {
-  // 不应该重试的状态码
+  // 不应该重试的状态码（401由自动刷新机制处理）
   const noRetryStatuses = [400, 401, 403, 404, 405, 422, 429]
   return !noRetryStatuses.includes(status)
+}
+
+// 从localStorage获取当前账户信息
+function getCurrentAccountFromStorage(): { address: string; password: string; token: string; providerId: string } | null {
+  if (typeof window === "undefined") return null
+
+  try {
+    const authData = localStorage.getItem("auth")
+    if (!authData) return null
+
+    const parsed = JSON.parse(authData)
+    const currentAccount = parsed.currentAccount
+    if (!currentAccount) return null
+
+    return {
+      address: currentAccount.address,
+      password: currentAccount.password,
+      token: currentAccount.token || parsed.token,
+      providerId: currentAccount.providerId || "duckmail"
+    }
+  } catch (error) {
+    console.error("[API] Failed to get current account from storage:", error)
+    return null
+  }
+}
+
+// 更新localStorage中的token，并通知auth-context同步更新
+function updateTokenInStorage(newToken: string): void {
+  if (typeof window === "undefined") return
+
+  try {
+    const authData = localStorage.getItem("auth")
+    if (!authData) return
+
+    const parsed = JSON.parse(authData)
+    if (parsed.currentAccount) {
+      parsed.currentAccount.token = newToken
+      // 同时更新accounts数组中对应账户的token
+      if (parsed.accounts && Array.isArray(parsed.accounts)) {
+        parsed.accounts = parsed.accounts.map((acc: any) =>
+          acc.address === parsed.currentAccount.address
+            ? { ...acc, token: newToken }
+            : acc
+        )
+      }
+    }
+    parsed.token = newToken
+
+    localStorage.setItem("auth", JSON.stringify(parsed))
+    console.log("🔄 [API] Token refreshed and saved to storage")
+
+    // 触发自定义事件，通知auth-context更新React state
+    window.dispatchEvent(new CustomEvent("token-refreshed", { detail: { token: newToken } }))
+  } catch (error) {
+    console.error("[API] Failed to update token in storage:", error)
+  }
+}
+
+// 全局变量：用于防止并发token刷新
+let refreshTokenPromise: Promise<string | null> | null = null
+
+// 尝试刷新token（在收到401时调用）- 带竞态保护
+async function tryRefreshToken(): Promise<string | null> {
+  // 如果已经有一个刷新请求在进行中，等待它完成
+  if (refreshTokenPromise) {
+    console.log("⏳ [API] Token refresh already in progress, waiting...")
+    return refreshTokenPromise
+  }
+
+  const account = getCurrentAccountFromStorage()
+  if (!account || !account.password) {
+    console.log("⚠️ [API] Cannot refresh token: no password stored")
+    return null
+  }
+
+  // 创建刷新Promise并存储，防止并发刷新
+  refreshTokenPromise = (async () => {
+    try {
+      console.log("🔄 [API] Attempting to refresh token for:", account.address)
+      const baseUrl = getApiBaseUrlForProvider(account.providerId)
+      const headers = {
+        ...createBaseHeaders(account.providerId),
+        "Content-Type": "application/json",
+      }
+
+      const res = await fetch(`${baseUrl}/token`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ address: account.address, password: account.password }),
+      })
+
+      if (!res.ok) {
+        console.log("❌ [API] Token refresh failed:", res.status)
+        return null
+      }
+
+      const data = await res.json()
+      const newToken = data.token
+
+      // 更新存储中的token
+      updateTokenInStorage(newToken)
+
+      console.log("✅ [API] Token refreshed successfully")
+      return newToken
+    } catch (error) {
+      console.error("❌ [API] Token refresh error:", error)
+      return null
+    } finally {
+      // 刷新完成后清除Promise，允许下次刷新
+      refreshTokenPromise = null
+    }
+  })()
+
+  return refreshTokenPromise
+}
+
+// 带自动token刷新的fetch函数
+async function fetchWithTokenRefresh(
+  url: string,
+  options: RequestInit,
+  providerId?: string,
+  retried = false
+): Promise<Response> {
+  const response = await fetch(url, options)
+
+  // 如果收到401且还没重试过，尝试刷新token
+  if (response.status === 401 && !retried) {
+    console.log("⚠️ [API] Received 401, attempting token refresh...")
+    const newToken = await tryRefreshToken()
+
+    if (newToken) {
+      // 用新token重试请求
+      const newHeaders = {
+        ...Object.fromEntries(new Headers(options.headers as HeadersInit).entries()),
+        Authorization: `Bearer ${newToken}`,
+      }
+
+      console.log("🔄 [API] Retrying request with new token...")
+      return fetchWithTokenRefresh(url, { ...options, headers: newHeaders }, providerId, true)
+    }
+  }
+
+  return response
 }
 
 // 重试函数，改进错误处理
@@ -416,15 +562,25 @@ export async function getMercureToken(token: string, providerId?: string): Promi
   throw new Error("Mercure is no longer supported. Please use polling on /messages instead.")
 }
 
-// 获取账户信息（只需要 JWT Token）
+// 获取账户信息（只需要 JWT Token）- 带自动token刷新
 export async function getAccount(token: string, providerId?: string): Promise<Account> {
   const baseUrl = getApiBaseUrlForProvider(providerId)
-  const headers = createHeadersWithToken(token, {}, providerId)
+  let currentToken = token
 
   const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/me`, { headers })
+    const headers = createHeadersWithToken(currentToken, {}, providerId)
+    const res = await fetchWithTokenRefresh(`${baseUrl}/me`, { headers }, providerId)
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const account = getCurrentAccountFromStorage()
+        if (account && account.token && account.token !== currentToken) {
+          currentToken = account.token
+          const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
+          const retryRes = await fetch(`${baseUrl}/me`, { headers: retryHeaders })
+          if (retryRes.ok) return retryRes
+        }
+      }
       const error = await res.json().catch(() => ({}))
       throw new Error(getErrorMessage(res.status, error))
     }
@@ -435,15 +591,28 @@ export async function getAccount(token: string, providerId?: string): Promise<Ac
   return response.json()
 }
 
-// 获取消息列表（只需要 JWT Token）
+// 获取消息列表（只需要 JWT Token）- 带自动token刷新
 export async function getMessages(token: string, page = 1, providerId?: string): Promise<{ messages: Message[]; total: number; hasMore: boolean }> {
   const baseUrl = getApiBaseUrlForProvider(providerId)
-  const headers = createHeadersWithToken(token, {}, providerId)
+  let currentToken = token
 
   const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/messages?page=${page}`, { headers })
+    const headers = createHeadersWithToken(currentToken, {}, providerId)
+    const res = await fetchWithTokenRefresh(`${baseUrl}/messages?page=${page}`, { headers }, providerId)
 
     if (!res.ok) {
+      // 如果刷新后仍然失败，检查是否需要更新token
+      if (res.status === 401) {
+        // 尝试从storage获取最新token（可能已被刷新）
+        const account = getCurrentAccountFromStorage()
+        if (account && account.token && account.token !== currentToken) {
+          currentToken = account.token
+          // 用新token重试一次
+          const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
+          const retryRes = await fetch(`${baseUrl}/messages?page=${page}`, { headers: retryHeaders })
+          if (retryRes.ok) return retryRes
+        }
+      }
       const error = await res.json().catch(() => ({}))
       console.log(`❌ [API] getMessages failed - Status: ${res.status}`)
       throw new Error(getErrorMessage(res.status, error))
@@ -466,15 +635,25 @@ export async function getMessages(token: string, page = 1, providerId?: string):
   }
 }
 
-// 获取单条消息详情（只需要 JWT Token）
+// 获取单条消息详情（只需要 JWT Token）- 带自动token刷新
 export async function getMessage(token: string, id: string, providerId?: string): Promise<MessageDetail> {
   const baseUrl = getApiBaseUrlForProvider(providerId)
-  const headers = createHeadersWithToken(token, {}, providerId)
+  let currentToken = token
 
   const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/messages/${id}`, { headers })
+    const headers = createHeadersWithToken(currentToken, {}, providerId)
+    const res = await fetchWithTokenRefresh(`${baseUrl}/messages/${id}`, { headers }, providerId)
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const account = getCurrentAccountFromStorage()
+        if (account && account.token && account.token !== currentToken) {
+          currentToken = account.token
+          const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
+          const retryRes = await fetch(`${baseUrl}/messages/${id}`, { headers: retryHeaders })
+          if (retryRes.ok) return retryRes
+        }
+      }
       const error = await res.json().catch(() => ({}))
       throw new Error(getErrorMessage(res.status, error))
     }
@@ -485,19 +664,34 @@ export async function getMessage(token: string, id: string, providerId?: string)
   return response.json()
 }
 
-// 标记消息为已读（只需要 JWT Token）
+// 标记消息为已读（只需要 JWT Token）- 带自动token刷新
 export async function markMessageAsRead(token: string, id: string, providerId?: string): Promise<{ seen: boolean }> {
   const baseUrl = getApiBaseUrlForProvider(providerId)
-  const headers = createHeadersWithToken(token, { "Content-Type": "application/merge-patch+json" }, providerId)
+  let currentToken = token
 
   const response = await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/messages/${id}`, {
+    const headers = createHeadersWithToken(currentToken, { "Content-Type": "application/merge-patch+json" }, providerId)
+    const res = await fetchWithTokenRefresh(`${baseUrl}/messages/${id}`, {
       method: "PATCH",
       headers,
       body: JSON.stringify({ seen: true }),
-    })
+    }, providerId)
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const account = getCurrentAccountFromStorage()
+        if (account && account.token && account.token !== currentToken) {
+          currentToken = account.token
+          const retryHeaders = createHeadersWithToken(currentToken, { "Content-Type": "application/merge-patch+json" }, providerId)
+          const retryRes = await fetch(`${baseUrl}/messages/${id}`, { method: "PATCH", headers: retryHeaders, body: JSON.stringify({ seen: true }) })
+          if (retryRes.ok) {
+            if (retryRes.headers.get("content-type")?.includes("application/json")) {
+              return retryRes.json()
+            }
+            return { seen: true }
+          }
+        }
+      }
       const error = await res.json().catch(() => ({}))
       throw new Error(getErrorMessage(res.status, error))
     }
@@ -511,18 +705,28 @@ export async function markMessageAsRead(token: string, id: string, providerId?: 
   return response
 }
 
-// 删除消息（只需要 JWT Token）
+// 删除消息（只需要 JWT Token）- 带自动token刷新
 export async function deleteMessage(token: string, id: string, providerId?: string): Promise<void> {
   const baseUrl = getApiBaseUrlForProvider(providerId)
-  const headers = createHeadersWithToken(token, {}, providerId)
+  let currentToken = token
 
   await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/messages/${id}`, {
+    const headers = createHeadersWithToken(currentToken, {}, providerId)
+    const res = await fetchWithTokenRefresh(`${baseUrl}/messages/${id}`, {
       method: "DELETE",
       headers,
-    })
+    }, providerId)
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const account = getCurrentAccountFromStorage()
+        if (account && account.token && account.token !== currentToken) {
+          currentToken = account.token
+          const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
+          const retryRes = await fetch(`${baseUrl}/messages/${id}`, { method: "DELETE", headers: retryHeaders })
+          if (retryRes.ok) return retryRes
+        }
+      }
       const error = await res.json().catch(() => ({}))
       throw new Error(getErrorMessage(res.status, error))
     }
@@ -531,18 +735,28 @@ export async function deleteMessage(token: string, id: string, providerId?: stri
   })
 }
 
-// 删除账户（只需要 JWT Token）
+// 删除账户（只需要 JWT Token）- 带自动token刷新
 export async function deleteAccount(token: string, id: string, providerId?: string): Promise<void> {
   const baseUrl = getApiBaseUrlForProvider(providerId)
-  const headers = createHeadersWithToken(token, {}, providerId)
+  let currentToken = token
 
   await retryFetch(async () => {
-    const res = await fetch(`${baseUrl}/accounts/${id}`, {
+    const headers = createHeadersWithToken(currentToken, {}, providerId)
+    const res = await fetchWithTokenRefresh(`${baseUrl}/accounts/${id}`, {
       method: "DELETE",
       headers,
-    })
+    }, providerId)
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const account = getCurrentAccountFromStorage()
+        if (account && account.token && account.token !== currentToken) {
+          currentToken = account.token
+          const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
+          const retryRes = await fetch(`${baseUrl}/accounts/${id}`, { method: "DELETE", headers: retryHeaders })
+          if (retryRes.ok) return retryRes
+        }
+      }
       const error = await res.json().catch(() => ({}))
       throw new Error(getErrorMessage(res.status, error))
     }
