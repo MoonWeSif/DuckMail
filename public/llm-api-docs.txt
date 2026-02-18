@@ -1,0 +1,226 @@
+# DuckMail API Reference
+# Base URL: https://api.duckmail.sbs
+# Authentication: Bearer Token or API Key (dk_xxx)
+# This file is designed to be sent to AI assistants for integration help.
+
+---
+
+## Authentication
+
+### Bearer Token
+Obtain a token via POST /token with email address and password.
+Include in requests: Authorization: Bearer <token>
+
+### API Key (Optional)
+For private domain access. Obtain from https://domain.duckmail.sbs
+Format: dk_ prefix. Include in requests: Authorization: Bearer dk_xxx
+
+---
+
+## Endpoints
+
+### [Domains] GET /domains
+Get available domain list. Returns private domains if API key is provided.
+Auth: Optional (API Key or Bearer Token)
+Query: page (default 1, 30 per page)
+Response:
+{
+  "hydra:member": [
+    {
+      "id": "string",
+      "domain": "example.com",
+      "ownerId": "string | null",
+      "isVerified": true,
+      "verificationToken": "duckmail-verify-xxx",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "hydra:totalItems": 10,
+  "hydra:view": {
+    "@id": "/domains?page=1",
+    "@type": "PartialCollectionView",
+    "hydra:first": "/domains?page=1",
+    "hydra:last": "/domains?page=1"
+  }
+}
+Note: Only verified domains are returned. System domains (ownerId=null) are visible to all.
+
+### [Accounts] POST /accounts
+Create a new email account. API key required for private domains.
+Auth: Optional (API Key or Bearer Token)
+Request:
+{
+  "address": "user@duckmail.sbs",
+  "password": "your_password"
+}
+Validation: address must contain @, username (before @) >= 3 chars, password >= 6 chars, domain must be verified.
+Response (201):
+{
+  "id": "string",
+  "address": "user@duckmail.sbs",
+  "authType": "email",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-01T00:00:00Z"
+}
+
+### [Auth] POST /token
+Get authentication token using email and password.
+Auth: None
+Request:
+{
+  "address": "user@duckmail.sbs",
+  "password": "your_password"
+}
+Response:
+{
+  "id": "account-id",
+  "token": "eyJhbGc..."
+}
+
+### [Accounts] GET /me
+Get current authenticated account info.
+Auth: Required (Bearer Token)
+Response:
+{
+  "id": "string",
+  "address": "user@duckmail.sbs",
+  "authType": "email",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-01T00:00:00Z"
+}
+
+### [Accounts] DELETE /accounts/{id}
+Delete your own account by ID. You can only delete the currently logged-in account.
+Auth: Required (Bearer Token)
+Response: 204 No Content
+
+### [Messages] GET /messages
+Get inbox message list (paginated, newest first).
+Auth: Required (Bearer Token)
+Query: page (default 1, 30 per page)
+Response:
+{
+  "hydra:member": [
+    {
+      "id": "string",
+      "msgid": "string",
+      "accountId": "string",
+      "from": { "name": "Sender", "address": "sender@example.com" },
+      "to": [{ "name": "You", "address": "you@duckmail.sbs" }],
+      "subject": "Email Subject",
+      "seen": false,
+      "isDeleted": false,
+      "hasAttachments": false,
+      "size": 1024,
+      "downloadUrl": "/serve/mailbox/...",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "hydra:totalItems": 5,
+  "hydra:view": { ... }
+}
+Note: List view does not include text/html body content.
+
+### [Messages] GET /messages/{id}
+Get full message details including body and attachments.
+Auth: Required (Bearer Token)
+Response:
+{
+  "id": "string",
+  "msgid": "string",
+  "accountId": "string",
+  "from": { "name": "Sender", "address": "sender@example.com" },
+  "to": [{ "name": "You", "address": "you@duckmail.sbs" }],
+  "subject": "Email Subject",
+  "text": "Plain text body",
+  "html": ["<html>...</html>"],
+  "seen": false,
+  "isDeleted": false,
+  "hasAttachments": true,
+  "size": 2048,
+  "downloadUrl": "/serve/mailbox/...",
+  "attachments": [
+    {
+      "id": "0",
+      "filename": "document.pdf",
+      "contentType": "application/pdf",
+      "disposition": "attachment",
+      "transferEncoding": "",
+      "related": false,
+      "size": 1024,
+      "downloadUrl": "/serve/mailbox/.../attach/0/document.pdf"
+    }
+  ],
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-01T00:00:00Z"
+}
+
+### [Messages] PATCH /messages/{id}
+Mark a message as read.
+Auth: Required (Bearer Token)
+Response: { "seen": true }
+
+### [Messages] DELETE /messages/{id}
+Delete a message by ID.
+Auth: Required (Bearer Token)
+Response: 204 No Content
+
+### [Messages] GET /sources/{id}
+Get raw email source (RFC 822 format).
+Auth: Required (Bearer Token)
+Response:
+{
+  "id": "string",
+  "downloadUrl": "/serve/mailbox/.../source",
+  "data": "From: sender@example.com\nTo: ..."
+}
+
+---
+
+## Error Response Format
+
+{
+  "error": "Error Type",
+  "message": "Detailed error message"
+}
+
+Status codes:
+- 400: Bad Request (invalid format)
+- 401: Unauthorized (missing or invalid token)
+- 403: Forbidden (no permission)
+- 404: Not Found
+- 409: Conflict (e.g. email address already exists)
+- 422: Unprocessable Entity (validation failed)
+- 500: Internal Server Error
+
+---
+
+## Quick Start Example
+
+# 1. Create account
+curl -X POST https://api.duckmail.sbs/accounts \
+  -H "Content-Type: application/json" \
+  -d '{"address": "test@duckmail.sbs", "password": "mypassword"}'
+
+# 2. Get token
+curl -X POST https://api.duckmail.sbs/token \
+  -H "Content-Type: application/json" \
+  -d '{"address": "test@duckmail.sbs", "password": "mypassword"}'
+
+# 3. Read messages
+curl https://api.duckmail.sbs/messages \
+  -H "Authorization: Bearer <your_token>"
+
+# 4. Get message detail
+curl https://api.duckmail.sbs/messages/<message_id> \
+  -H "Authorization: Bearer <your_token>"
+
+# 5. Mark message as read
+curl -X PATCH https://api.duckmail.sbs/messages/<message_id> \
+  -H "Authorization: Bearer <your_token>"
+
+# 6. Get domains (with API key for private domains)
+curl https://api.duckmail.sbs/domains \
+  -H "Authorization: Bearer dk_your_api_key"

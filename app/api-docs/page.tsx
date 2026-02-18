@@ -31,7 +31,6 @@ import {
   MessageSquare,
   User,
   Trash2,
-  Download,
   Eye,
   FileText,
   Info,
@@ -63,6 +62,11 @@ const content = {
       "我们欢迎开发者为 DuckMail API 创建集成、库和工具。如果您有任何贡献，请随时联系我们或在我们的 GitHub 仓库上提交拉取请求。",
     githubRepo: "GitHub 仓库",
     contactUs: "联系我们",
+    llmDocs: "AI 友好文档",
+    llmDocsDescription: "纯文本格式的 API 文档，可将链接直接发送给 AI 助手帮您编写集成代码。",
+    copySuccess: "已复制到剪贴板",
+    copyLink: "复制链接",
+    openLink: "打开链接",
     tryItOut: "试一试",
     authorization: "授权",
     bearerToken: "Bearer Token",
@@ -105,6 +109,11 @@ const content = {
       "We welcome developers to create integrations, libraries, and tools for the DuckMail API. If you have any contributions, feel free to contact us or submit a pull request on our GitHub repository.",
     githubRepo: "GitHub Repository",
     contactUs: "Contact Us",
+    llmDocs: "AI-Friendly Docs",
+    llmDocsDescription: "Plain-text API reference. Share the link with AI assistants to help write integration code.",
+    copySuccess: "Copied to clipboard",
+    copyLink: "Copy Link",
+    openLink: "Open Link",
     tryItOut: "Try it out",
     authorization: "Authorization",
     bearerToken: "Bearer Token",
@@ -458,6 +467,8 @@ export default function ApiDocsPage() {
   const router = useRouter()
   const [currentLocale, setCurrentLocale] = useState("zh")
 
+  const [copySuccess, setCopySuccess] = useState(false)
+
   useEffect(() => {
     const savedLocale = localStorage.getItem("duckmail-locale") || "zh"
     setCurrentLocale(savedLocale)
@@ -497,6 +508,52 @@ export default function ApiDocsPage() {
         </header>
 
         <main className="space-y-8">
+          {/* AI-Friendly Docs */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-2xl font-semibold flex items-center gap-2">
+                <FileText size={20} /> {currentContent.llmDocs}
+              </h2>
+            </CardHeader>
+            <CardBody>
+              <p className="text-default-600 mb-4">{currentContent.llmDocsDescription}</p>
+              <div className="flex items-center gap-3 bg-default-100 rounded-lg p-3 mb-4">
+                <NextCode className="text-sm flex-1 truncate">
+                  https://raw.githubusercontent.com/MoonWeSif/DuckMail/main/public/llm-api-docs.txt
+                </NextCode>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  as="a"
+                  href="https://raw.githubusercontent.com/MoonWeSif/DuckMail/main/public/llm-api-docs.txt"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="primary"
+                  variant="flat"
+                  startContent={<ExternalLink size={16} />}
+                >
+                  {currentContent.openLink}
+                </Button>
+                <Button
+                  variant="bordered"
+                  startContent={<Code size={16} />}
+                  color={copySuccess ? "success" : "default"}
+                  onPress={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        "https://raw.githubusercontent.com/MoonWeSif/DuckMail/main/public/llm-api-docs.txt"
+                      )
+                      setCopySuccess(true)
+                      setTimeout(() => setCopySuccess(false), 2000)
+                    } catch {}
+                  }}
+                >
+                  {copySuccess ? currentContent.copySuccess : currentContent.copyLink}
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+
           <Card>
             <CardHeader>
               <h2 className="text-2xl font-semibold flex items-center gap-2">
