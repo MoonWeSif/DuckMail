@@ -1,56 +1,62 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Button } from "@heroui/button"
 import { Card } from "@heroui/card"
 import { Mail, RefreshCw, Code, HelpCircle, MessageSquare, ExternalLink, Bell } from "lucide-react"
+import { useTranslations } from "next-intl"
+
+// 侧边栏广告组件
+function SidebarAd() {
+  const adRef = useRef<HTMLModElement>(null)
+  const pushed = useRef(false)
+
+  useEffect(() => {
+    if (adRef.current && !pushed.current) {
+      try {
+        ;((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({})
+        pushed.current = true
+      } catch {
+        // AdSense 脚本尚未加载，忽略
+      }
+    }
+  }, [])
+
+  return (
+    <div className="px-4 py-2">
+      <ins
+        ref={adRef}
+        className="adsbygoogle"
+        style={{ display: "block" }}
+        data-ad-client="ca-pub-5940655086623123"
+        data-ad-slot="3389348840"
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
+  )
+}
 
 interface SidebarProps {
   activeItem: string
   onItemClick: (item: string) => void
-  currentLocale: string
   isMobile?: boolean
 }
 
-export default function Sidebar({ activeItem, onItemClick, currentLocale, isMobile = false }: SidebarProps) {
+export default function Sidebar({ activeItem, onItemClick, isMobile = false }: SidebarProps) {
+  const t = useTranslations("sidebar")
+
   const menuItems = [
-    {
-      id: "inbox",
-      label: currentLocale === "en" ? "Inbox" : "收件箱",
-      icon: Mail
-    },
-    {
-      id: "refresh",
-      label: currentLocale === "en" ? "Refresh" : "刷新",
-      icon: RefreshCw
-    },
+    { id: "inbox", label: t("inbox"), icon: Mail },
+    { id: "refresh", label: t("refresh"), icon: RefreshCw },
   ]
 
   const bottomItems = [
-    {
-      id: "update-notice",
-      label: currentLocale === "en" ? "Updates" : "更新通知",
-      icon: Bell
-    },
-    {
-      id: "api",
-      label: currentLocale === "en" ? "API" : "API 文档",
-      icon: Code
-    },
-    {
-      id: "faq",
-      label: currentLocale === "en" ? "FAQ" : "常见问题",
-      icon: HelpCircle
-    },
-    {
-      id: "privacy",
-      label: currentLocale === "en" ? "Privacy" : "隐私政策",
-      icon: MessageSquare
-    },
-    {
-      id: "github",
-      label: "GitHub",
-      icon: ExternalLink
-    },
+    { id: "update-notice", label: t("updates"), icon: Bell },
+    { id: "api", label: t("api"), icon: Code },
+    { id: "faq", label: t("faq"), icon: HelpCircle },
+    { id: "privacy", label: t("privacy"), icon: MessageSquare },
+    { id: "github", label: "GitHub", icon: ExternalLink },
   ]
 
   return (
@@ -70,7 +76,7 @@ export default function Sidebar({ activeItem, onItemClick, currentLocale, isMobi
         </div>
       )}
 
-      <div className="p-4 space-y-3 flex-grow">
+      <div className="p-4 space-y-3">
         {menuItems.map((item) => {
           const Icon = item.icon
           return (
@@ -87,6 +93,12 @@ export default function Sidebar({ activeItem, onItemClick, currentLocale, isMobi
           )
         })}
       </div>
+
+      {/* Google AdSense 广告 - 仅桌面端显示 */}
+      {!isMobile && <SidebarAd />}
+
+      {/* 占位弹性区域 */}
+      <div className="flex-grow" />
 
       <div className="p-4 space-y-2 border-t border-gray-200 dark:border-gray-800">
         {bottomItems.map((item) => {

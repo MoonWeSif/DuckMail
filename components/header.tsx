@@ -11,16 +11,16 @@ import { useAuth } from "@/contexts/auth-context"
 import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useMailStatus } from "@/contexts/mail-status-context"
 import { SettingsPanel } from "@/components/settings-panel"
+import { useTranslations, useLocale } from "next-intl"
 
 interface HeaderProps {
   onCreateAccount: () => void
-  currentLocale: string
-  onLocaleChange: (locale: string) => void
+  onLocaleChange: () => void
   onLogin?: () => void
   isMobile?: boolean
 }
 
-export default function Header({ onCreateAccount, currentLocale, onLocaleChange, onLogin, isMobile = false }: HeaderProps) {
+export default function Header({ onCreateAccount, onLocaleChange, onLogin, isMobile = false }: HeaderProps) {
   const { theme, setTheme } = useTheme()
   const { isAuthenticated, currentAccount, accounts, logout, switchAccount, deleteAccount } = useAuth()
   const [mounted, setMounted] = useState(false)
@@ -28,6 +28,9 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { toast } = useHeroUIToast()
   const { isEnabled, setIsEnabled } = useMailStatus()
+  const t = useTranslations("header")
+  const tc = useTranslations("common")
+  const locale = useLocale()
 
   useEffect(() => {
     setMounted(true)
@@ -38,16 +41,16 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
       try {
         await navigator.clipboard.writeText(text)
         if (type === "email") setCopiedEmail(true)
-        toast({ title: `${type === "email" ? "邮箱地址" : "内容"}已复制`, description: text })
+        toast({ title: type === "email" ? tc("emailCopied") : tc("contentCopied"), description: text })
         setTimeout(() => {
           if (type === "email") setCopiedEmail(false)
         }, 2000)
       } catch (err) {
-        toast({ title: "复制失败", description: "无法访问剪贴板", color: "danger", variant: "flat" })
+        toast({ title: tc("copyFailed"), description: tc("clipboardError"), color: "danger", variant: "flat" })
         console.error("Failed to copy: ", err)
       }
     },
-    [toast],
+    [toast, tc],
   )
 
   if (!mounted) return null
@@ -63,17 +66,13 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
     return colors[hash % colors.length]
   }
 
-  const toggleLocale = () => {
-    onLocaleChange(currentLocale === "en" ? "zh" : "en")
-  }
-
   const toggleMailChecker = () => {
     const newState = !isEnabled
     setIsEnabled(newState)
 
     toast({
-      title: newState ? "已开启邮件自动检查" : "已关闭邮件自动检查",
-      description: newState ? "每 1 秒自动刷新收件箱" : "不再自动刷新收件箱，可手动点击刷新",
+      title: newState ? t("mailCheckEnabled") : t("mailCheckDisabled"),
+      description: newState ? t("mailCheckEnabledDesc") : t("mailCheckDisabledDesc"),
       color: newState ? "success" : "warning",
       variant: "flat",
       icon: <Wifi size={16} />,
@@ -103,12 +102,12 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>{copiedEmail ? "已复制!" : "点击复制邮箱地址"}</p>
+                <p>{copiedEmail ? tc("copied") : tc("copyEmailTooltip")}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <div className="w-px h-6" /> // Placeholder for spacing if not authenticated
+          <div className="w-px h-6" />
         )}
       </div>
 
@@ -124,9 +123,7 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                   size="sm"
                   onPress={toggleMailChecker}
                   className="text-gray-600 dark:text-gray-300"
-                  aria-label={
-                    isEnabled ? "关闭邮件自动检查" : "开启邮件自动检查"
-                  }
+                  aria-label={isEnabled ? t("disableMailCheck") : t("enableMailCheck")}
                 >
                   <Wifi
                     size={16}
@@ -137,10 +134,10 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
               <TooltipContent side="bottom" className="max-w-xs">
                 <div className="space-y-1">
                   <p className="font-medium text-sm">
-                    {isEnabled ? "邮件自动检查已开启" : "邮件自动检查已关闭"}
+                    {isEnabled ? t("mailAutoCheckOn") : t("mailAutoCheckOff")}
                   </p>
                   <p className="text-xs text-gray-600">
-                    {isEnabled ? "当前每 2 秒轮询一次收件箱" : "不会自动轮询，可手动点击刷新按钮查看新邮件"}
+                    {isEnabled ? t("mailAutoCheckOnDesc") : t("mailAutoCheckOffDesc")}
                   </p>
                 </div>
               </TooltipContent>
@@ -154,7 +151,7 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
           size="sm"
           onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
           className="text-gray-600 dark:text-gray-300"
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={theme === "dark" ? t("switchToLight") : t("switchToDark")}
         >
           {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </Button>
@@ -163,9 +160,9 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
           isIconOnly
           variant="light"
           size="sm"
-          onPress={toggleLocale}
+          onPress={onLocaleChange}
           className="text-gray-600 dark:text-gray-300"
-          aria-label={`Switch to ${currentLocale === "en" ? "Chinese" : "English"}`}
+          aria-label={locale === "en" ? t("switchToChinese") : t("switchToEnglish")}
         >
           <Languages size={18} />
         </Button>
@@ -176,7 +173,7 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
           size="sm"
           onPress={() => setIsSettingsOpen(true)}
           className="text-gray-600 dark:text-gray-300"
-          aria-label={currentLocale === "en" ? "Settings" : "设置"}
+          aria-label={t("settings")}
         >
           <Settings size={18} />
         </Button>
@@ -198,7 +195,7 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
           <DropdownMenu aria-label="User actions">
             {[
               ...(isAuthenticated && currentAccount ? [
-                <DropdownSection key="current-account" title={currentLocale === "en" ? "Current Account" : "当前账户"} showDivider>
+                <DropdownSection key="current-account" title={t("currentAccount")} showDivider>
                   <DropdownItem
                     key="current-email"
                     textValue={currentAccount.address}
@@ -220,9 +217,8 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
               ] : []),
 
               ...(isAuthenticated && accounts.length > 1 ? [
-                <DropdownSection key="switch-accounts" title={currentLocale === "en" ? "Switch Account" : "切换账户"} showDivider>
+                <DropdownSection key="switch-accounts" title={t("switchAccount")} showDivider>
                   {(() => {
-                    // 按提供商分组账户
                     const accountsByProvider = accounts.reduce((acc, account) => {
                       const providerId = account.providerId || "duckmail"
                       if (!acc[providerId]) {
@@ -232,7 +228,6 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                       return acc
                     }, {} as Record<string, typeof accounts>)
 
-                    // 获取提供商名称
                     const getProviderName = (providerId: string) => {
                       switch (providerId) {
                         case "duckmail": return "DuckMail"
@@ -242,7 +237,6 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                     }
 
                     return Object.entries(accountsByProvider).flatMap(([providerId, providerAccounts]) => [
-                      // 如果有多个提供商，显示提供商分组标题
                       ...(Object.keys(accountsByProvider).length > 1 ? [
                         <DropdownItem key={`provider-${providerId}`} className="opacity-60 cursor-default pointer-events-none">
                           <div className="flex items-center gap-2">
@@ -256,7 +250,6 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                           </div>
                         </DropdownItem>
                       ] : []),
-                      // 该提供商的账户
                       ...providerAccounts
                         .filter((account) => account.address !== currentAccount?.address)
                         .map((account) => (
@@ -274,8 +267,8 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                                 await switchAccount(account)
                               } catch (error) {
                                 toast({
-                                  title: currentLocale === "en" ? "Account Switch Failed" : "切换账户失败",
-                                  description: currentLocale === "en" ? "Please try logging in to this account again" : "请尝试重新登录该账户",
+                                  title: t("accountSwitchFailed"),
+                                  description: t("accountSwitchFailedDesc"),
                                   color: "danger",
                                   variant: "flat"
                                 })
@@ -298,10 +291,10 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                 {isAuthenticated && currentAccount ? (
                   <>
                     <DropdownItem key="login_another" startContent={<User size={16} />} onPress={onLogin || (() => {})}>
-                      {currentLocale === "en" ? "Login Another Account" : "登录其他账户"}
+                      {t("loginAnother")}
                     </DropdownItem>
                     <DropdownItem key="create_another" startContent={<UserPlus size={16} />} onPress={onCreateAccount}>
-                      {currentLocale === "en" ? "Create New Account" : "创建新账户"}
+                      {t("createNew")}
                     </DropdownItem>
                     <DropdownItem
                       key="delete"
@@ -310,16 +303,16 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
                       startContent={<Trash2 size={16} />}
                       onPress={() => currentAccount && deleteAccount(currentAccount.id)}
                     >
-                      {currentLocale === "en" ? "Delete Current Account" : "删除当前账户"}
+                      {t("deleteCurrent")}
                     </DropdownItem>
                   </>
                 ) : (
                   <>
                     <DropdownItem key="login" startContent={<User size={16} />} onPress={onLogin || (() => {})}>
-                      {currentLocale === "en" ? "Login Existing Account" : "登录现有账户"}
+                      {t("loginExisting")}
                     </DropdownItem>
                     <DropdownItem key="create" startContent={<UserPlus size={16} />} onPress={onCreateAccount}>
-                      {currentLocale === "en" ? "Create New Account" : "创建新账户"}
+                      {t("createNew")}
                     </DropdownItem>
                   </>
                 )}
@@ -335,7 +328,7 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
             size="sm"
             onPress={logout}
             className="text-gray-600 dark:text-gray-300"
-            aria-label="Logout"
+            aria-label={t("logout")}
           >
             <LogOut size={18} />
           </Button>
@@ -345,7 +338,6 @@ export default function Header({ onCreateAccount, currentLocale, onLocaleChange,
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        currentLocale={currentLocale}
       />
     </header>
   )

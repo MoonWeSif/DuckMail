@@ -1,7 +1,6 @@
 "use client"
 
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useTransition } from "react"
 import Header from "@/components/header"
 import Sidebar from "@/components/sidebar"
 import EmptyState from "@/components/empty-state"
@@ -17,7 +16,9 @@ import { MailStatusProvider } from "@/contexts/mail-status-context"
 import type { Message } from "@/types"
 import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { Languages, CheckCircle, Navigation, RefreshCw, Menu, AlertCircle } from "lucide-react"
+import { useTranslations, useLocale } from "next-intl"
+import { useRouter, usePathname } from "@/i18n/navigation"
+import { CheckCircle, Navigation, RefreshCw, Menu, AlertCircle, Languages } from "lucide-react"
 import { Button } from "@heroui/button"
 
 // 生成随机字符串，用于用户名和密码
@@ -45,7 +46,6 @@ function MainContent() {
   const [loginAccountAddress, setLoginAccountAddress] = useState<string>("")
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
   const { isAuthenticated, currentAccount, accounts, register } = useAuth()
-  const [currentLocale, setCurrentLocale] = useState("zh")
   const [refreshKey, setRefreshKey] = useState(0)
   const { toast } = useHeroUIToast()
   const isMobile = useIsMobile()
@@ -55,33 +55,10 @@ function MainContent() {
   const [createdAccountInfo, setCreatedAccountInfo] = useState<{ email: string; password: string } | null>(null)
   const [isUpdateNoticeModalOpen, setIsUpdateNoticeModalOpen] = useState(false)
 
-  // 检测浏览器语言并设置默认语言
-  useEffect(() => {
-    const detectBrowserLanguage = () => {
-      const browserLang = navigator.language || navigator.languages?.[0] || "zh"
-      const langCode = browserLang.toLowerCase()
-
-      // 如果是英文相关语言，设置为英文，否则默认中文
-      if (langCode.startsWith("en")) {
-        return "en"
-      }
-      return "zh"
-    }
-
-    // 从 localStorage 获取保存的语言设置，如果没有则使用浏览器检测
-    const savedLocale = localStorage.getItem("duckmail-locale")
-    if (savedLocale && (savedLocale === "en" || savedLocale === "zh")) {
-      setCurrentLocale(savedLocale)
-    } else {
-      const detectedLocale = detectBrowserLanguage()
-      setCurrentLocale(detectedLocale)
-      localStorage.setItem("duckmail-locale", detectedLocale)
-    }
-  }, [])
-
-  useEffect(() => {
-    document.documentElement.lang = currentLocale === "en" ? "en" : "zh-CN"
-  }, [currentLocale])
+  const t = useTranslations("mainPage")
+  const locale = useLocale()
+  const router = useRouter()
+  const pathname = usePathname()
 
   // 检查是否需要显示更新通知（仅显示一次）
   useEffect(() => {
@@ -89,7 +66,6 @@ function MainContent() {
 
     const noticeShown = localStorage.getItem("duckmail-update-notice-2026-01-16")
     if (!noticeShown) {
-      // 延迟显示，避免和其他弹窗冲突
       const timer = setTimeout(() => {
         setIsUpdateNoticeModalOpen(true)
         localStorage.setItem("duckmail-update-notice-2026-01-16", "true")
@@ -117,13 +93,12 @@ function MainContent() {
       console.error("Failed to parse saved auth from localStorage:", error)
     }
 
-    // 当前会话里已经有账号或处于登录状态，也不需要自动创建
     if (isAuthenticated || currentAccount || (accounts && accounts.length > 0)) {
       setAutoAccountHandled(true)
       return
     }
 
-    // 如果用户禁用了 DuckMail 提供商，则不自动创建，避免违背用户高级设置
+    // 如果用户禁用了 DuckMail 提供商，则不自动创建
     try {
       const disabledProviders = JSON.parse(localStorage.getItem("disabled-api-providers") || "[]")
       if (Array.isArray(disabledProviders) && disabledProviders.includes("duckmail")) {
@@ -148,17 +123,14 @@ function MainContent() {
         try {
           await register(email, password)
 
-          // 显示 Toast 简短提示
-          const isZh = currentLocale !== "en"
           toast({
-            title: isZh ? "已为你创建临时邮箱" : "Temporary email created",
-            description: isZh ? "请在顶部横幅中查看并保存账户信息" : "Check and save your account info in the banner above",
+            title: t("tempMailCreated"),
+            description: t("checkBanner"),
             color: "success",
             variant: "flat",
             icon: <CheckCircle size={16} />
           })
 
-          // 显示顶部 Banner 展示详细信息
           setCreatedAccountInfo({ email, password })
           setShowAccountBanner(true)
           return
@@ -170,20 +142,14 @@ function MainContent() {
             message.includes("already used") ||
             message.includes("already exists")
 
-          // 如果只是地址重复，换一个用户名继续重试
           if (isAddressTaken && attempt < maxAttempts - 1) {
             continue
           }
 
-          const isZh = currentLocale !== "en"
           console.error("自动创建临时邮箱失败:", error)
           toast({
-            title: isZh ? "自动创建临时邮箱失败" : "Failed to create temporary email",
-            description:
-              message ||
-              (isZh
-                ? "请稍后重试，或者手动创建一个邮箱账号。"
-                : "Please try again later or create an account manually."),
+            title: t("createFailed"),
+            description: message || t("createFailedDesc"),
             color: "danger",
             variant: "flat",
             icon: <AlertCircle size={16} />
@@ -194,13 +160,17 @@ function MainContent() {
     }
 
     createTemporaryAccount()
-  }, [autoAccountHandled, isAuthenticated, currentAccount, accounts, register, toast, currentLocale])
+  }, [autoAccountHandled, isAuthenticated, currentAccount, accounts, register, toast, t])
 
-  const handleLocaleChange = (locale: string) => {
-    setCurrentLocale(locale)
-    localStorage.setItem("duckmail-locale", locale)
+  const [isPending, startTransition] = useTransition()
+
+  const handleLocaleChange = () => {
+    const newLocale = locale === "en" ? "zh" : "en"
+    startTransition(() => {
+      router.replace(pathname, { locale: newLocale })
+    })
     toast({
-      title: locale === "en" ? "Switched to English" : "已切换到中文",
+      title: newLocale === "en" ? t("switchedToEn") : t("switchedToZh"),
       color: "primary",
       variant: "flat",
       icon: <Languages size={16} />
@@ -235,8 +205,8 @@ function MainContent() {
   const handleDeleteMessageInDetail = (messageId: string) => {
     setSelectedMessage(null)
     toast({
-      title: "Message Deleted",
-      description: `Message ID: ${messageId} has been removed.`,
+      title: t("messageDeleted"),
+      description: t("messageDeletedDesc", { id: messageId }),
       color: "success",
       variant: "flat",
       icon: <CheckCircle size={16} />
@@ -252,14 +222,12 @@ function MainContent() {
     }
 
     if (item === "refresh") {
-      // 手动刷新邮件
       toast({
-        title: currentLocale === "en" ? "Refreshing emails..." : "正在刷新邮件...",
+        title: t("refreshing"),
         color: "primary",
         variant: "flat",
         icon: <RefreshCw size={16} />
       })
-      // 触发 MessageList 组件重新获取邮件
       setRefreshKey(prev => prev + 1)
       return
     }
@@ -270,27 +238,23 @@ function MainContent() {
     }
 
     if (item === "github" || item === "faq") {
-      // 跳转到GitHub仓库（FAQ也跳转到GitHub）
       window.open("https://github.com/moonwesif/DuckMail", "_blank", "noopener,noreferrer")
       return
     }
 
     if (item === "api") {
-      // 跳转到API文档页面
-      window.open("/api-docs", "_blank", "noopener,noreferrer")
+      window.open(`/${locale}/api-docs`, "_blank", "noopener,noreferrer")
       return
     }
 
     if (item === "privacy") {
-      // 跳转到隐私政策页面
-      window.open("/privacy", "_blank", "noopener,noreferrer")
+      window.open(`/${locale}/privacy`, "_blank", "noopener,noreferrer")
       return
     }
 
-    // 其他选项显示敬请期待（虽然现在应该没有其他选项了）
     toast({
       title: item,
-      description: currentLocale === "en" ? "Coming soon..." : "敬请期待...",
+      description: t("comingSoon"),
       color: "warning",
       variant: "flat",
       icon: <Navigation size={16} />
@@ -299,10 +263,10 @@ function MainContent() {
 
   return (
     <>
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
+      <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
         {/* 桌面端侧边栏 */}
         {!isMobile && (
-          <Sidebar activeItem="inbox" onItemClick={handleSidebarItemClick} currentLocale={currentLocale} />
+          <Sidebar activeItem="inbox" onItemClick={handleSidebarItemClick} />
         )}
 
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -315,7 +279,7 @@ function MainContent() {
                 size="sm"
                 onPress={() => setIsSidebarOpen(true)}
                 className="text-gray-600 dark:text-gray-300"
-                aria-label="打开菜单"
+                aria-label={t("openMenu")}
               >
                 <Menu size={20} />
               </Button>
@@ -329,23 +293,21 @@ function MainContent() {
                 </div>
                 <span className="font-semibold text-lg text-gray-800 dark:text-white">duckmail.sbs</span>
               </div>
-              <div className="w-8" /> {/* 占位符保持居中 */}
+              <div className="w-8" />
             </div>
           )}
 
           <Header
             onCreateAccount={handleCreateAccount}
-            onLogin={handleLogin}
-            currentLocale={currentLocale}
             onLocaleChange={handleLocaleChange}
+            onLogin={handleLogin}
             isMobile={isMobile}
           />
-          {/* 账户信息横幅 - 自动创建账户后显示 */}
+          {/* 账户信息横幅 */}
           {showAccountBanner && createdAccountInfo && (
             <AccountInfoBanner
               email={createdAccountInfo.email}
               password={createdAccountInfo.password}
-              currentLocale={currentLocale}
               onClose={() => {
                 setShowAccountBanner(false)
                 setCreatedAccountInfo(null)
@@ -363,13 +325,13 @@ function MainContent() {
                       onDelete={handleDeleteMessageInDetail}
                     />
                   ) : (
-                    <MessageList onSelectMessage={handleSelectMessage} currentLocale={currentLocale} refreshKey={refreshKey} />
+                    <MessageList onSelectMessage={handleSelectMessage} refreshKey={refreshKey} />
                   )
                 ) : (
-                  <EmptyState onCreateAccount={handleCreateAccount} isAuthenticated={isAuthenticated} currentLocale={currentLocale} />
+                  <EmptyState onCreateAccount={handleCreateAccount} isAuthenticated={isAuthenticated} />
                 )}
               </div>
-              {(!isAuthenticated || !currentAccount) && <FeatureCards currentLocale={currentLocale} />}
+              {(!isAuthenticated || !currentAccount) && <FeatureCards />}
             </div>
           </main>
         </div>
@@ -411,7 +373,6 @@ function MainContent() {
                   handleSidebarItemClick(item)
                   setIsSidebarOpen(false)
                 }}
-                currentLocale={currentLocale}
                 isMobile={true}
               />
             </div>
@@ -419,17 +380,15 @@ function MainContent() {
         )}
       </div>
 
-      <AccountModal isOpen={isAccountModalOpen} onClose={handleCloseModal} currentLocale={currentLocale} />
+      <AccountModal isOpen={isAccountModalOpen} onClose={handleCloseModal} />
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={handleCloseLoginModal}
         accountAddress={loginAccountAddress}
-        currentLocale={currentLocale}
       />
       <UpdateNoticeModal
         isOpen={isUpdateNoticeModalOpen}
         onClose={() => setIsUpdateNoticeModalOpen(false)}
-        currentLocale={currentLocale}
       />
     </>
   )

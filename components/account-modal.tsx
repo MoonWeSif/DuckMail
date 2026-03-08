@@ -9,14 +9,14 @@ import { useAuth } from "@/contexts/auth-context"
 import { DomainSelector } from "@/components/domain-selector"
 import { Eye, EyeOff, User, AlertCircle } from "lucide-react"
 import { Card, CardBody } from "@heroui/card"
+import { useTranslations } from "next-intl"
 
 interface AccountModalProps {
   isOpen: boolean
   onClose: () => void
-  currentLocale: string
 }
 
-export default function AccountModal({ isOpen, onClose, currentLocale }: AccountModalProps) {
+export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [selectedDomain, setSelectedDomain] = useState<string>("")
@@ -25,12 +25,12 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [showLoginOption, setShowLoginOption] = useState(false)
   const { register, login } = useAuth()
-
-
+  const t = useTranslations("accountModal")
+  const tc = useTranslations("common")
 
   const handleSubmit = async () => {
     if (!username || !selectedDomain || !password) {
-      setError(currentLocale === "en" ? "Please fill in all required fields" : "请填写所有必填字段")
+      setError(t("fillAllFields"))
       return
     }
 
@@ -43,42 +43,27 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
     try {
       await register(email, password)
       onClose()
-      // 重置表单
       setUsername("")
       setPassword("")
       setError(null)
       setShowLoginOption(false)
     } catch (error: any) {
       console.error("Registration failed:", error)
-
-      // 根据错误类型提供不同的处理
       const errorMessage = error.message || ""
 
-      // 检查是否是邮箱已存在的错误（支持中英文）
       if (errorMessage.includes("该邮箱地址已被使用") ||
           errorMessage.includes("Email address already exists") ||
           errorMessage.includes("already used") ||
           errorMessage.includes("already exists")) {
-        // 邮箱已存在，提示用户可以尝试登录
-        setError(
-          currentLocale === "en"
-            ? "This email address is already in use. If this is your account, you can try logging in."
-            : "该邮箱地址已被使用。如果这是您的账户，您可以尝试登录。"
-        )
+        setError(t("emailTaken"))
         setShowLoginOption(true)
       } else if (errorMessage.includes("请求过于频繁") ||
                  errorMessage.includes("rate limit") ||
                  errorMessage.includes("Too many requests")) {
-        // 请求过于频繁
-        setError(
-          currentLocale === "en"
-            ? "Too many requests. Please wait a moment and try again."
-            : "请求过于频繁，请稍等片刻后再试。"
-        )
+        setError(t("rateLimited"))
         setShowLoginOption(false)
       } else {
-        // 其他错误
-        setError(errorMessage || (currentLocale === "en" ? "Failed to create account, please try again later" : "创建账户失败，请稍后再试"))
+        setError(errorMessage || t("createFailed"))
         setShowLoginOption(false)
       }
     } finally {
@@ -87,9 +72,7 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
   }
 
   const handleTryLogin = async () => {
-    if (!username || !selectedDomain || !password) {
-      return
-    }
+    if (!username || !selectedDomain || !password) return
 
     setIsLoading(true)
     setError(null)
@@ -100,18 +83,13 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
     try {
       await login(email, password)
       onClose()
-      // 重置表单
       setUsername("")
       setPassword("")
       setError(null)
       setShowLoginOption(false)
     } catch (error: any) {
       console.error("Login failed:", error)
-      setError(
-        currentLocale === "en"
-          ? "Login failed. Please check your password or try creating a new account with a different username."
-          : "登录失败。请检查您的密码或尝试使用不同的用户名创建新账户。"
-      )
+      setError(t("loginFailed"))
       setShowLoginOption(false)
     } finally {
       setIsLoading(false)
@@ -129,25 +107,18 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
               <User size={24} className="text-blue-600" />
             </div>
           </div>
-          <h2 className="text-xl font-semibold text-center">
-            {currentLocale === "en" ? "Create Account" : "创建账户"}
-          </h2>
-          <p className="text-sm text-gray-500 text-center">
-            {currentLocale === "en"
-              ? "Here you can create a new account. You need to choose a username and set a password!"
-              : "在这里，你可以创建一个新的账户为止，你需要选择一个用户名，然后填写密码！"
-            }
-          </p>
+          <h2 className="text-xl font-semibold text-center">{t("title")}</h2>
+          <p className="text-sm text-gray-500 text-center">{t("subtitle")}</p>
         </ModalHeader>
         <ModalBody>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {currentLocale === "en" ? "Email" : "电子邮件"}
+                {t("emailLabel")}
               </label>
               <div className="space-y-3">
                 <Input
-                  label={currentLocale === "en" ? "Username" : "用户名"}
+                  label={t("usernameLabel")}
                   placeholder="johndoe"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -156,16 +127,15 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
                 <DomainSelector
                   value={selectedDomain}
                   onSelectionChange={setSelectedDomain}
-                  currentLocale={currentLocale}
                   isDisabled={isLoading}
                 />
               </div>
-              {!username && <p className="text-xs text-red-500 mt-1">{currentLocale === "en" ? "Required" : "必填"}</p>}
+              {!username && <p className="text-xs text-red-500 mt-1">{tc("required")}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {currentLocale === "en" ? "Password" : "密码"}
+                {t("passwordLabel")}
               </label>
               <Input
                 type={isPasswordVisible ? "text" : "password"}
@@ -189,15 +159,8 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
                 <div className="flex items-start gap-2">
                   <AlertCircle size={16} className="text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                      {currentLocale === "en" ? "Important Notice" : "重要提醒"}
-                    </p>
-                    <p className="text-yellow-700 dark:text-yellow-300">
-                      {currentLocale === "en"
-                        ? "duckmail.sbs does not provide password recovery. Please remember your password."
-                        : "duckmail.sbs 不提供密码找回功能，请务必记住您设置的密码。"
-                      }
-                    </p>
+                    <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">{t("importantNotice")}</p>
+                    <p className="text-yellow-700 dark:text-yellow-300">{t("noPasswordRecovery")}</p>
                   </div>
                 </div>
               </CardBody>
@@ -215,12 +178,8 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
-                        {currentLocale === "en" ? "Account Creation Failed" : "账户创建失败"}
-                      </p>
-                      <p className="text-sm text-red-600 dark:text-red-300 leading-relaxed">
-                        {error}
-                      </p>
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">{t("creationFailed")}</p>
+                      <p className="text-sm text-red-600 dark:text-red-300 leading-relaxed">{error}</p>
                       {showLoginOption && (
                         <div className="flex gap-2 mt-3">
                           <Button
@@ -232,7 +191,7 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
                             startContent={<User size={14} />}
                             className="font-medium"
                           >
-                            {currentLocale === "en" ? "Try Login" : "尝试登录"}
+                            {t("tryLogin")}
                           </Button>
                         </div>
                       )}
@@ -245,7 +204,7 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
         </ModalBody>
         <ModalFooter>
           <Button variant="bordered" onPress={onClose} isDisabled={isLoading}>
-            {currentLocale === "en" ? "Cancel" : "取消"}
+            {tc("cancel")}
           </Button>
           <Button
             color="primary"
@@ -253,7 +212,7 @@ export default function AccountModal({ isOpen, onClose, currentLocale }: Account
             isLoading={isLoading}
             isDisabled={!username || !selectedDomain || !password}
           >
-            {currentLocale === "en" ? "Create" : "创建"}
+            {tc("create")}
           </Button>
         </ModalFooter>
       </ModalContent>

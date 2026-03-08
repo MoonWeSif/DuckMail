@@ -12,34 +12,36 @@ import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useMailStatus } from "@/contexts/mail-status-context"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { formatDistanceToNow } from "date-fns"
-import { enUS, zhCN } from "date-fns/locale" // Import both locales
+import { enUS, zhCN } from "date-fns/locale"
 import { Mail } from "lucide-react"
+import { useTranslations, useLocale } from "next-intl"
 
 interface MessageListProps {
   onSelectMessage: (message: Message) => void
-  currentLocale: string // Add currentLocale prop
-  refreshKey?: number // 用于触发手动刷新
+  refreshKey?: number
 }
 
-export default function MessageList({ onSelectMessage, currentLocale, refreshKey }: MessageListProps) {
+export default function MessageList({ onSelectMessage, refreshKey }: MessageListProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { token, currentAccount } = useAuth() // Get currentAccount to refresh on account switch
+  const { token, currentAccount } = useAuth()
   const { toast } = useHeroUIToast()
   const { isEnabled } = useMailStatus()
   const isMobile = useIsMobile()
+  const t = useTranslations("messageList")
+  const locale = useLocale()
 
   // 处理新消息通知
   const handleNewMessage = useCallback((message: Message) => {
     toast({
-      title: currentLocale === "en" ? "New Email Received" : "收到新邮件",
-      description: `${currentLocale === "en" ? "From" : "来自"}: ${message.from.address}`,
+      title: t("newEmail"),
+      description: `${t("from")}: ${message.from.address}`,
       color: "success",
       variant: "flat",
       icon: <Mail size={16} />,
     })
-  }, [currentLocale, toast])
+  }, [t, toast])
 
   // 处理消息列表更新
   const handleMessagesUpdate = useCallback((newMessages: Message[]) => {
@@ -62,13 +64,12 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
       setError(null)
     } catch (err) {
       console.error("Failed to refresh messages:", err)
-      setError(currentLocale === "en" ? "Failed to refresh emails. Please try again." : "刷新邮件失败，请稍后再试")
+      setError(t("refreshError"))
     } finally {
       setLoading(false)
     }
-  }, [token, currentAccount, currentLocale])
+  }, [token, currentAccount, t])
 
-  // 使用简单轮询方案：每 2 秒检查一次新邮件
   useMailChecker({
     onNewMessage: handleNewMessage,
     onMessagesUpdate: handleMessagesUpdate,
@@ -76,7 +77,7 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     enabled: isEnabled,
   })
 
-  // 初始加载 - 当账户或token变化时重新加载
+  // 初始加载
   useEffect(() => {
     const fetchInitialMessages = async () => {
       if (!token || !currentAccount) {
@@ -96,7 +97,7 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
         console.log(`📥 [MessageList] Loaded ${fetchedMessages?.length || 0} initial messages`)
       } catch (err) {
         console.error("Failed to fetch messages:", err)
-        setError(currentLocale === "en" ? "Failed to fetch emails. Please try again." : "获取邮件失败，请稍后再试")
+        setError(t("fetchError"))
         setMessages([])
       } finally {
         setLoading(false)
@@ -104,7 +105,7 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     }
 
     fetchInitialMessages()
-  }, [token, currentAccount?.id, currentLocale]) // 使用 currentAccount.id 而不是整个对象
+  }, [token, currentAccount?.id, t])
 
   // 监听手动刷新
   useEffect(() => {
@@ -117,16 +118,12 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     return (
       <div className="h-full overflow-y-auto p-4">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-            {currentLocale === "en" ? "Inbox" : "收件箱"}
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t("inbox")}</h2>
         </div>
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
             <Spinner size="lg" color="primary" />
-            <p className="mt-4 text-gray-500 dark:text-gray-400">
-              {currentLocale === "en" ? "Loading emails..." : "正在加载邮件..."}
-            </p>
+            <p className="mt-4 text-gray-500 dark:text-gray-400">{t("loading")}</p>
           </div>
         </div>
       </div>
@@ -137,9 +134,7 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     return (
       <div className="h-full overflow-y-auto p-4">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-            {currentLocale === "en" ? "Inbox" : "收件箱"}
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t("inbox")}</h2>
         </div>
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
@@ -157,22 +152,14 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     return (
       <div className="h-full overflow-y-auto p-4">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-            {currentLocale === "en" ? "Inbox" : "收件箱"}
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t("inbox")}</h2>
         </div>
         <div className="flex flex-col justify-center items-center h-64 text-center">
           <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
             <Mail className="w-10 h-10 text-gray-400" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            {currentLocale === "en" ? "Inbox is empty" : "收件箱为空"}
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-md">
-            {currentLocale === "en"
-              ? "You haven't received any emails yet. When you do, they'll show up here as beautiful cards."
-              : "您还没有收到任何邮件。当您收到邮件时，它们将以精美的卡片形式显示在这里。"}
-          </p>
+          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">{t("emptyTitle")}</h3>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md">{t("emptyDesc")}</p>
         </div>
       </div>
     )
@@ -182,9 +169,8 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
     <div className={`h-full w-full overflow-y-auto ${isMobile ? 'p-2' : 'p-4'}`}>
       <div className={`${isMobile ? 'mb-4' : 'mb-6'} w-full`}>
         <h2 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-800 dark:text-gray-100`}>
-          {currentLocale === "en" ? "Inbox" : "收件箱"}
+          {t("inbox")}
         </h2>
-        {/* 状态指示器（仅展示轮询状态，Mercure 已移除） */}
         <div className={`flex items-center gap-2 text-xs text-gray-500 ${isMobile ? 'mt-1' : 'mt-2'} ${isMobile ? 'flex-wrap' : ''}`}>
           <div
             className={`w-2 h-2 rounded-full ${
@@ -192,16 +178,10 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
             }`}
           />
           <span className={isMobile ? 'text-xs' : ''}>
-            {isEnabled
-              ? currentLocale === "en"
-                ? "🔄 Polling for new messages (1s interval)"
-                : "🔄 正在轮询新邮件（2秒间隔）"
-              : currentLocale === "en"
-                ? "⏸ Polling paused"
-                : "⏸ 轮询已暂停"}
+            {isEnabled ? t("pollingActive") : t("pollingPaused")}
           </span>
           <span className="text-xs text-gray-400 ml-2">
-            邮件数: {messages.length}
+            {t("messageCount")}: {messages.length}
           </span>
         </div>
       </div>
@@ -219,7 +199,6 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
           >
             <CardBody className={`${isMobile ? 'p-3' : 'p-5'} w-full`}>
               <div className={`flex items-start ${isMobile ? 'space-x-3' : 'space-x-4'} w-full`}>
-                {/* 头像 */}
                 <div className="relative">
                   <Avatar
                     name={message.from.name
@@ -232,13 +211,11 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
                     }`}
                     size={isMobile ? "md" : "lg"}
                   />
-                  {/* 未读标识 */}
                   {!message.seen && (
                     <div className={`absolute -top-1 -right-1 ${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} bg-primary-500 border-2 border-white dark:border-gray-800 rounded-full`}></div>
                   )}
                 </div>
 
-                {/* 邮件内容 */}
                 <div className="flex-1 min-w-0">
                   <div className={`flex items-start justify-between ${isMobile ? 'mb-1' : 'mb-2'}`}>
                     <div className="flex-1 min-w-0">
@@ -265,12 +242,12 @@ export default function MessageList({ onSelectMessage, currentLocale, refreshKey
                       }`}>
                         {formatDistanceToNow(new Date(message.createdAt), {
                           addSuffix: true,
-                          locale: currentLocale === "en" ? enUS : zhCN,
+                          locale: locale === "en" ? enUS : zhCN,
                         })}
                       </span>
                       {!message.seen && (
                         <div className={`${isMobile ? 'mt-0.5 px-1.5 py-0.5' : 'mt-1 px-2 py-0.5'} bg-primary-500 text-white text-xs rounded-full font-medium`}>
-                          {currentLocale === "en" ? "New" : "新"}
+                          {t("new")}
                         </div>
                       )}
                     </div>

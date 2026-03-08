@@ -8,18 +8,16 @@ import { useAuth } from "@/contexts/auth-context"
 import { Eye, EyeOff, LogIn, AlertCircle } from "lucide-react"
 import { Card, CardBody } from "@heroui/card"
 import { DomainSelector } from "@/components/domain-selector"
+import { useTranslations } from "next-intl"
 
 interface LoginModalProps {
   isOpen: boolean
   onClose: () => void
   accountAddress?: string
-  currentLocale: string
 }
 
-export default function LoginModal({ isOpen, onClose, accountAddress, currentLocale }: LoginModalProps) {
-  // 完整邮箱登录模式使用的地址
+export default function LoginModal({ isOpen, onClose, accountAddress }: LoginModalProps) {
   const [address, setAddress] = useState(accountAddress || "")
-  // 拆分模式使用的用户名和域名
   const [username, setUsername] = useState("")
   const [selectedDomain, setSelectedDomain] = useState<string>("")
   const [loginMode, setLoginMode] = useState<"split" | "full">("split")
@@ -28,8 +26,9 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
   const [error, setError] = useState<string | null>(null)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const { login } = useAuth()
+  const t = useTranslations("loginModal")
+  const tc = useTranslations("common")
 
-  // 根据传入的 accountAddress 预填用户名/域名
   useEffect(() => {
     if (!isOpen) return
 
@@ -43,10 +42,8 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
         setUsername(accountAddress)
         setSelectedDomain("")
       }
-      // 从现有账号进入时，默认采用“用户名 + 域名”模式
       setLoginMode("split")
     } else {
-      // 新打开时重置为拆分模式，方便选择域名
       setLoginMode("split")
     }
   }, [isOpen, accountAddress])
@@ -68,22 +65,14 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
     if (loginMode === "split") {
       if (!username || !selectedDomain) {
         setIsLoading(false)
-        setError(
-          currentLocale === "en"
-            ? "Please fill in username and select a domain"
-            : "请填写用户名并选择域名"
-        )
+        setError(t("fillUsernameAndDomain"))
         return
       }
       loginAddress = `${username}@${selectedDomain}`
     } else {
       if (!address) {
         setIsLoading(false)
-        setError(
-          currentLocale === "en"
-            ? "Please fill in email address and password"
-            : "请填写邮箱地址和密码"
-        )
+        setError(t("fillEmailAndPassword"))
         return
       }
     }
@@ -91,7 +80,6 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
     try {
       await login(loginAddress, password)
       onClose()
-      // 重置表单
       setAddress("")
       setUsername("")
       setSelectedDomain("")
@@ -99,7 +87,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
       setError(null)
     } catch (error: any) {
       console.error("Login failed:", error)
-      setError(error.message || (currentLocale === "en" ? "Login failed, please check email address and password" : "登录失败，请检查邮箱地址和密码"))
+      setError(error.message || t("loginFailed"))
     } finally {
       setIsLoading(false)
     }
@@ -125,21 +113,13 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
               <LogIn size={24} className="text-green-600" />
             </div>
           </div>
-          <h2 className="text-xl font-semibold text-center">
-            {currentLocale === "en" ? "Login Account" : "登录账户"}
-          </h2>
-          <p className="text-sm text-gray-500 text-center">
-            {currentLocale === "en"
-              ? "Please enter your email address and password to login"
-              : "请输入您的邮箱地址和密码来登录"
-            }
-          </p>
+          <h2 className="text-xl font-semibold text-center">{t("title")}</h2>
+          <p className="text-sm text-gray-500 text-center">{t("subtitle")}</p>
         </ModalHeader>
         <ModalBody>
           <div className="space-y-4">
-            {/* 登录方式切换：完整邮箱 / 用户名 + 域名 */}
             <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-              <span>{currentLocale === "en" ? "Login mode:" : "登录方式："}</span>
+              <span>{t("loginMode")}</span>
               <button
                 type="button"
                 className={`px-2 py-1 rounded ${
@@ -150,7 +130,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
                 onClick={() => setLoginMode("split")}
                 disabled={isLoading}
               >
-                {currentLocale === "en" ? "Username + Domain" : "用户名 + 域名"}
+                {t("splitMode")}
               </button>
               <span>/</span>
               <button
@@ -163,14 +143,14 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
                 onClick={() => setLoginMode("full")}
                 disabled={isLoading}
               >
-                {currentLocale === "en" ? "Full Email" : "完整邮箱"}
+                {t("fullMode")}
               </button>
             </div>
 
             {loginMode === "full" ? (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {currentLocale === "en" ? "Email Address" : "邮箱地址"}
+                  {t("emailLabel")}
                 </label>
                 <Input
                   type="email"
@@ -184,11 +164,11 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {currentLocale === "en" ? "Username" : "用户名"}
+                    {t("usernameLabel")}
                   </label>
                   <Input
                     type="text"
-                    placeholder={currentLocale === "en" ? "your_name" : "你的用户名"}
+                    placeholder={t("usernamePlaceholder")}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     isDisabled={isLoading || !!accountAddress}
@@ -201,7 +181,6 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
                     onSelectionChange={(domain) => {
                       setSelectedDomain(domain)
                     }}
-                    currentLocale={currentLocale}
                     isDisabled={isLoading}
                   />
                 </div>
@@ -210,7 +189,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {currentLocale === "en" ? "Password" : "密码"}
+                {t("passwordLabel")}
               </label>
               <Input
                 type={isPasswordVisible ? "text" : "password"}
@@ -234,15 +213,8 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
                 <div className="flex items-start gap-2">
                   <AlertCircle size={16} className="text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                      {currentLocale === "en" ? "Important Notice" : "重要提醒"}
-                    </p>
-                    <p className="text-yellow-700 dark:text-yellow-300">
-                      {currentLocale === "en"
-                        ? "duckmail.sbs does not provide password recovery. Please make sure you remember the correct password."
-                        : "duckmail.sbs 不提供密码找回功能，请确保您记住了正确的密码。"
-                      }
-                    </p>
+                    <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">{t("importantNotice")}</p>
+                    <p className="text-yellow-700 dark:text-yellow-300">{t("noPasswordRecovery")}</p>
                   </div>
                 </div>
               </CardBody>
@@ -257,7 +229,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
         </ModalBody>
         <ModalFooter>
           <Button variant="bordered" onPress={handleClose} isDisabled={isLoading}>
-            {currentLocale === "en" ? "Cancel" : "取消"}
+            {tc("cancel")}
           </Button>
           <Button
             color="primary"
@@ -265,7 +237,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress, currentLoc
             isLoading={isLoading}
             isDisabled={!canSubmit}
           >
-            {currentLocale === "en" ? "Login" : "登录"}
+            {tc("login")}
           </Button>
         </ModalFooter>
       </ModalContent>
