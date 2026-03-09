@@ -156,6 +156,19 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Create a Pull Request
 
+## 📢 About Ads
+
+This project includes Google AdSense ads in the desktop sidebar (desktop only, not shown on mobile).
+
+**Why ads?**
+
+DuckMail is a completely free and open-source project, but the backend server costs are real:
+- Continuous operation and maintenance of the mail server
+- Domain renewal and SSL certificates
+- Server bandwidth and storage costs
+
+Ad revenue will be **used to cover server operating costs**, helping the project run stably in the long term. If you fork this project for self-deployment, feel free to remove or replace the ad code with your own.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

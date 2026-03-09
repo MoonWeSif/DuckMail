@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react"
 import Header from "@/components/header"
 import Sidebar from "@/components/sidebar"
+import { AdSenseBanner } from "@/components/adsense-banner"
 import EmptyState from "@/components/empty-state"
 import FeatureCards from "@/components/feature-cards"
 import AccountModal from "@/components/account-modal"
@@ -332,6 +333,8 @@ function MainContent() {
                 )}
               </div>
               {(!isAuthenticated || !currentAccount) && <FeatureCards />}
+              {/* Google AdSense 广告 - 仅桌面端，放在内容区域底部 */}
+              {!isMobile && <AdSenseBanner />}
             </div>
           </main>
         </div>

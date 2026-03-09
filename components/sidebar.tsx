@@ -1,41 +1,9 @@
 "use client"
 
-import { useEffect, useRef } from "react"
 import { Button } from "@heroui/button"
 import { Card } from "@heroui/card"
 import { Mail, RefreshCw, Code, HelpCircle, MessageSquare, ExternalLink, Bell } from "lucide-react"
 import { useTranslations } from "next-intl"
-
-// 侧边栏广告组件
-function SidebarAd() {
-  const adRef = useRef<HTMLModElement>(null)
-  const pushed = useRef(false)
-
-  useEffect(() => {
-    if (adRef.current && !pushed.current) {
-      try {
-        ;((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({})
-        pushed.current = true
-      } catch {
-        // AdSense 脚本尚未加载，忽略
-      }
-    }
-  }, [])
-
-  return (
-    <div className="px-4 py-2">
-      <ins
-        ref={adRef}
-        className="adsbygoogle"
-        style={{ display: "block" }}
-        data-ad-client="ca-pub-5940655086623123"
-        data-ad-slot="3389348840"
-        data-ad-format="auto"
-        data-full-width-responsive="true"
-      />
-    </div>
-  )
-}
 
 interface SidebarProps {
   activeItem: string
@@ -94,10 +62,6 @@ export default function Sidebar({ activeItem, onItemClick, isMobile = false }: S
         })}
       </div>
 
-      {/* Google AdSense 广告 - 仅桌面端显示 */}
-      {!isMobile && <SidebarAd />}
-
-      {/* 占位弹性区域 */}
       <div className="flex-grow" />
 
       <div className="p-4 space-y-2 border-t border-gray-200 dark:border-gray-800">
