@@ -59,8 +59,9 @@
     "title": "Temp Mail",
     "description": "Protect your personal email address from spam, bots, phishing, and other online abuse with our free temporary disposable anonymous email service.",
     "noRisk": "No commitments, no risks—just secure, instant access to a temp email address.",
-    "poweredBy": "Powered by Mail.tm's free API service. We thank Mail.tm for providing reliable temporary email infrastructure.",
-    "useNow": "Use Now"
+    "poweredBy": "DuckMail runs its own backend service to deliver stable and reliable temporary email. Mail.tm is available as an optional fallback provider.",
+    "useNow": "Create Temporary Inbox",
+    "creating": "Creating..."
   },
   "featureCards": {
     "secureTitle": "Secure Temporary Email",
@@ -69,7 +70,7 @@
     "instantDesc": "No more wasting precious time on registrations, form-filling, or solving captchas. Your temp email address is ready for use instantly, putting you in control effortlessly.",
     "fastTitle": "Fast and Anonymous Email Service",
     "fastDesc": "Experience fast message delivery without delays or restrictions. Our service is finely tuned for maximum delivery speed, ensuring you stay connected seamlessly.",
-    "poweredBy": "Powered by Mail.tm's free API service. Special thanks to Mail.tm for providing reliable temporary email infrastructure that makes this service possible."
+    "poweredBy": "DuckMail uses its own self-hosted backend API. Mail.tm is available as an optional provider for some users."
   },
   "messageList": {
     "inbox": "Inbox",

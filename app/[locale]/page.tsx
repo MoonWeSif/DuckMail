@@ -6,7 +6,6 @@ import Sidebar from "@/components/sidebar"
 import { AdSenseBanner } from "@/components/adsense-banner"
 import EmptyState from "@/components/empty-state"
 import FeatureCards from "@/components/feature-cards"
-import FaqSection from "@/components/faq-section"
 import AccountModal from "@/components/account-modal"
 import LoginModal from "@/components/login-modal"
 import AccountInfoBanner from "@/components/account-info-banner"
@@ -52,7 +51,7 @@ function MainContent() {
   const { toast } = useHeroUIToast()
   const isMobile = useIsMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [autoAccountHandled, setAutoAccountHandled] = useState(false)
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false)
   const [showAccountBanner, setShowAccountBanner] = useState(false)
   const [createdAccountInfo, setCreatedAccountInfo] = useState<{ email: string; password: string } | null>(null)
   const [isUpdateNoticeModalOpen, setIsUpdateNoticeModalOpen] = useState(false)
@@ -76,93 +75,60 @@ function MainContent() {
     }
   }, [])
 
-  // 首次访问时自动创建临时邮箱并登录
-  useEffect(() => {
-    if (autoAccountHandled) return
-    if (typeof window === "undefined") return
+  // 一键创建临时邮箱（用户手动触发）
+  const handleQuickCreate = async () => {
+    if (isCreatingAccount) return
+    setIsCreatingAccount(true)
 
-    // 如果本地已经有 auth 记录（说明之前登录/使用过），则不再自动创建
-    try {
-      const savedAuth = localStorage.getItem("auth")
-      if (savedAuth) {
-        const parsed = JSON.parse(savedAuth)
-        if (parsed?.accounts && Array.isArray(parsed.accounts) && parsed.accounts.length > 0) {
-          setAutoAccountHandled(true)
-          return
-        }
-      }
-    } catch (error) {
-      console.error("Failed to parse saved auth from localStorage:", error)
-    }
+    const maxAttempts = 5
+    const domain = "duckmail.sbs"
 
-    if (isAuthenticated || currentAccount || (accounts && accounts.length > 0)) {
-      setAutoAccountHandled(true)
-      return
-    }
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const username = generateRandomString(10)
+      const password = generateRandomString(12)
+      const email = `${username}@${domain}`
 
-    // 如果用户禁用了 DuckMail 提供商，则不自动创建
-    try {
-      const disabledProviders = JSON.parse(localStorage.getItem("disabled-api-providers") || "[]")
-      if (Array.isArray(disabledProviders) && disabledProviders.includes("duckmail")) {
-        setAutoAccountHandled(true)
+      try {
+        await register(email, password)
+
+        toast({
+          title: t("tempMailCreated"),
+          description: t("checkBanner"),
+          color: "success",
+          variant: "flat",
+          icon: <CheckCircle size={16} />
+        })
+
+        setCreatedAccountInfo({ email, password })
+        setShowAccountBanner(true)
+        setIsCreatingAccount(false)
         return
-      }
-    } catch (error) {
-      console.error("Failed to read disabled providers from localStorage:", error)
-    }
+      } catch (error: any) {
+        const message = error?.message || ""
+        const isAddressTaken =
+          message.includes("该邮箱地址已被使用") ||
+          message.includes("Email address already exists") ||
+          message.includes("already used") ||
+          message.includes("already exists")
 
-    setAutoAccountHandled(true)
-
-    const createTemporaryAccount = async () => {
-      const maxAttempts = 5
-      const domain = "duckmail.sbs"
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const username = generateRandomString(10)
-        const password = generateRandomString(12)
-        const email = `${username}@${domain}`
-
-        try {
-          await register(email, password)
-
-          toast({
-            title: t("tempMailCreated"),
-            description: t("checkBanner"),
-            color: "success",
-            variant: "flat",
-            icon: <CheckCircle size={16} />
-          })
-
-          setCreatedAccountInfo({ email, password })
-          setShowAccountBanner(true)
-          return
-        } catch (error: any) {
-          const message = error?.message || ""
-          const isAddressTaken =
-            message.includes("该邮箱地址已被使用") ||
-            message.includes("Email address already exists") ||
-            message.includes("already used") ||
-            message.includes("already exists")
-
-          if (isAddressTaken && attempt < maxAttempts - 1) {
-            continue
-          }
-
-          console.error("自动创建临时邮箱失败:", error)
-          toast({
-            title: t("createFailed"),
-            description: message || t("createFailedDesc"),
-            color: "danger",
-            variant: "flat",
-            icon: <AlertCircle size={16} />
-          })
-          break
+        if (isAddressTaken && attempt < maxAttempts - 1) {
+          continue
         }
+
+        console.error("一键创建临时邮箱失败:", error)
+        toast({
+          title: t("createFailed"),
+          description: message || t("createFailedDesc"),
+          color: "danger",
+          variant: "flat",
+          icon: <AlertCircle size={16} />
+        })
+        break
       }
     }
 
-    createTemporaryAccount()
-  }, [autoAccountHandled, isAuthenticated, currentAccount, accounts, register, toast, t])
+    setIsCreatingAccount(false)
+  }
 
   const [isPending, startTransition] = useTransition()
 
@@ -239,8 +205,13 @@ function MainContent() {
       return
     }
 
-    if (item === "github" || item === "faq") {
+    if (item === "github") {
       window.open("https://github.com/moonwesif/DuckMail", "_blank", "noopener,noreferrer")
+      return
+    }
+
+    if (item === "faq") {
+      window.open(`/${locale}/faq`, "_blank", "noopener,noreferrer")
       return
     }
 
@@ -330,15 +301,13 @@ function MainContent() {
                     <MessageList onSelectMessage={handleSelectMessage} refreshKey={refreshKey} />
                   )
                 ) : (
-                  <EmptyState onCreateAccount={handleCreateAccount} isAuthenticated={isAuthenticated} />
+                  <EmptyState onCreateAccount={handleQuickCreate} isAuthenticated={isAuthenticated} isCreating={isCreatingAccount} />
                 )}
               </div>
-              {/* 未登录状态：展示功能卡片、FAQ 富内容区域及广告 */}
+              {/* 未登录落地页：功能卡片 + 广告（有内容支撑，符合 AdSense 要求） */}
               {(!isAuthenticated || !currentAccount) && (
                 <>
                   <FeatureCards />
-                  <FaqSection />
-                  {/* Google AdSense 广告 - 仅桌面端，置于内容丰富的区域之后 */}
                   {!isMobile && <AdSenseBanner />}
                 </>
               )}

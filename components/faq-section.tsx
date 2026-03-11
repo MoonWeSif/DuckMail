@@ -15,53 +15,87 @@ export default function FaqSection() {
     { q: t("q7"), a: t("a7") },
   ]
 
+  const useCaseIcons = ["🛡️", "🧪", "💻", "🔒"]
+  const useCaseKeys = ["useCase1", "useCase2", "useCase3", "useCase4"] as const
+
+  const steps = [
+    { num: 1, color: "from-blue-500 to-blue-600", titleKey: "step1Title", descKey: "step1Desc" },
+    { num: 2, color: "from-violet-500 to-violet-600", titleKey: "step2Title", descKey: "step2Desc" },
+    { num: 3, color: "from-emerald-500 to-emerald-600", titleKey: "step3Title", descKey: "step3Desc" },
+  ] as const
+
   return (
-    <div className="w-full px-6 py-8 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-      {/* 使用场景 */}
-      <section className="mb-10">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">{t("useCasesTitle")}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(["useCase1", "useCase2", "useCase3", "useCase4"] as const).map((key) => (
-            <div key={key} className="flex items-start gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
-              <span className="mt-0.5 text-blue-500 text-lg select-none">✓</span>
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{t(key)}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <div className="w-full bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700/60">
+      <div className="max-w-5xl mx-auto px-6 py-10 space-y-12">
 
-      {/* 如何使用 */}
-      <section className="mb-10">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">{t("howToUseTitle")}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {([1, 2, 3] as const).map((step) => (
-            <div key={step} className="relative p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center mb-3">
-                {step}
+        {/* 使用场景 */}
+        <section>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-5 flex items-center gap-2">
+            <span className="w-1 h-5 rounded-full bg-blue-500 inline-block" />
+            {t("useCasesTitle")}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {useCaseKeys.map((key, i) => (
+              <div
+                key={key}
+                className="flex items-start gap-3 p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+              >
+                <span className="text-xl shrink-0 mt-0.5">{useCaseIcons[i]}</span>
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{t(key)}</p>
               </div>
-              <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">{t(`step${step}Title` as any)}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{t(`step${step}Desc` as any)}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
-      {/* FAQ */}
-      <section>
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-6">{t("faqTitle")}</h2>
-        <div className="space-y-5">
-          {faqs.map((item, index) => (
-            <div key={index} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="px-5 py-4 bg-gray-50 dark:bg-gray-800">
-                <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm">{item.q}</h3>
+        {/* 如何使用 */}
+        <section>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-5 flex items-center gap-2">
+            <span className="w-1 h-5 rounded-full bg-violet-500 inline-block" />
+            {t("howToUseTitle")}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {steps.map((step) => (
+              <div key={step.num} className="relative p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${step.color} text-white text-sm font-bold flex items-center justify-center mb-4 shadow-sm`}>
+                  {step.num}
+                </div>
+                <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-2 text-sm">{t(step.titleKey)}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{t(step.descKey)}</p>
               </div>
-              <div className="px-5 py-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{item.a}</p>
+            ))}
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-5 flex items-center gap-2">
+            <span className="w-1 h-5 rounded-full bg-emerald-500 inline-block" />
+            {t("faqTitle")}
+          </h2>
+          <div className="space-y-2">
+            {faqs.map((item, index) => (
+              <div
+                key={index}
+                className="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden"
+              >
+                <div className="px-5 py-3.5 flex items-start gap-3">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center mt-0.5">
+                    Q
+                  </span>
+                  <p className="font-medium text-gray-800 dark:text-gray-100 text-sm">{item.q}</p>
+                </div>
+                <div className="px-5 pb-4 flex items-start gap-3">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center mt-0.5">
+                    A
+                  </span>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{item.a}</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+
+      </div>
     </div>
   )
 }

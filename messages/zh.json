@@ -59,8 +59,9 @@
     "title": "临时邮件",
     "description": "使用我们的免费临时一次性匿名邮件服务，保护您的个人邮箱地址免受垃圾邮件、机器人、钓鱼和其他在线滥用的侵害。",
     "noRisk": "无需承诺，无风险——只需安全、即时地访问临时邮箱地址。",
-    "poweredBy": "由 Mail.tm 的免费 API 服务提供支持。我们感谢 Mail.tm 提供可靠的临时邮件基础设施。",
-    "useNow": "立即使用"
+    "poweredBy": "DuckMail 使用自建后端服务，为您提供稳定可靠的临时邮件服务，Mail.tm 作为备选提供商。",
+    "useNow": "一键创建临时邮箱",
+    "creating": "正在创建..."
   },
   "featureCards": {
     "secureTitle": "安全的临时邮箱",
@@ -69,7 +70,7 @@
     "instantDesc": "不再浪费宝贵时间进行注册、填表或解决验证码。您的临时邮箱地址可立即使用，让您轻松掌控一切。",
     "fastTitle": "快速匿名邮件服务",
     "fastDesc": "体验快速的消息传递，无延迟或限制。我们的服务经过精心调优，确保最大传递速度，让您保持无缝连接。",
-    "poweredBy": "由 Mail.tm 的免费 API 服务提供支持。特别感谢 Mail.tm 提供可靠的临时邮件基础设施，使这项服务成为可能。"
+    "poweredBy": "DuckMail 使用自建后端 API 服务，Mail.tm 作为部分用户的备选提供商。"
   },
   "messageList": {
     "inbox": "收件箱",
