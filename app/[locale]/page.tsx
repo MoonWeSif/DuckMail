@@ -6,6 +6,7 @@ import Sidebar from "@/components/sidebar"
 import { AdSenseBanner } from "@/components/adsense-banner"
 import EmptyState from "@/components/empty-state"
 import FeatureCards from "@/components/feature-cards"
+import FaqSection from "@/components/faq-section"
 import AccountModal from "@/components/account-modal"
 import LoginModal from "@/components/login-modal"
 import AccountInfoBanner from "@/components/account-info-banner"
@@ -332,9 +333,15 @@ function MainContent() {
                   <EmptyState onCreateAccount={handleCreateAccount} isAuthenticated={isAuthenticated} />
                 )}
               </div>
-              {(!isAuthenticated || !currentAccount) && <FeatureCards />}
-              {/* Google AdSense 广告 - 仅桌面端，放在内容区域底部 */}
-              {!isMobile && <AdSenseBanner />}
+              {/* 未登录状态：展示功能卡片、FAQ 富内容区域及广告 */}
+              {(!isAuthenticated || !currentAccount) && (
+                <>
+                  <FeatureCards />
+                  <FaqSection />
+                  {/* Google AdSense 广告 - 仅桌面端，置于内容丰富的区域之后 */}
+                  {!isMobile && <AdSenseBanner />}
+                </>
+              )}
             </div>
           </main>
         </div>
