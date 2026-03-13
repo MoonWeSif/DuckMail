@@ -3,7 +3,6 @@
 import { useState, useEffect, useTransition } from "react"
 import Header from "@/components/header"
 import Sidebar from "@/components/sidebar"
-import { AdSenseBanner } from "@/components/adsense-banner"
 import EmptyState from "@/components/empty-state"
 import FeatureCards from "@/components/feature-cards"
 import AccountModal from "@/components/account-modal"
@@ -111,10 +110,12 @@ function MainContent() {
           message.includes("already used") ||
           message.includes("already exists")
 
+        // 仅地址已被占用时换用户名重试（极低概率）
         if (isAddressTaken && attempt < maxAttempts - 1) {
           continue
         }
 
+        // 其他错误直接展示给用户
         console.error("一键创建临时邮箱失败:", error)
         toast({
           title: t("createFailed"),
@@ -306,10 +307,7 @@ function MainContent() {
               </div>
               {/* 未登录落地页：功能卡片 + 广告（有内容支撑，符合 AdSense 要求） */}
               {(!isAuthenticated || !currentAccount) && (
-                <>
-                  <FeatureCards />
-                  {!isMobile && <AdSenseBanner />}
-                </>
+                <FeatureCards />
               )}
             </div>
           </main>

@@ -171,6 +171,11 @@ function getProviderConfig(providerId: string) {
   }
 }
 
+// 将后端端点路径转换为本地代理 URL（解决 CORS 问题，仅用于客户端）
+function buildProxyUrl(endpoint: string): string {
+  return `/api/mail?endpoint=${encodeURIComponent(endpoint)}`
+}
+
 // 根据API文档改进错误处理
 function getErrorMessage(status: number, errorData: any): string {
   // 前缀添加HTTP状态码，便于retryFetch识别
@@ -305,7 +310,7 @@ async function tryRefreshToken(): Promise<string | null> {
         "Content-Type": "application/json",
       }
 
-      const res = await fetch(`${baseUrl}/token`, {
+      const res = await fetch(buildProxyUrl('/token'), {
         method: "POST",
         headers,
         body: JSON.stringify({ address: account.address, password: account.password }),
@@ -404,8 +409,7 @@ export async function fetchDomainsFromProvider(providerId: string): Promise<Doma
     console.log(`📤 [API] fetchDomainsFromProvider baseUrl=${baseUrl}`)
 
     const response = await retryFetch(async () => {
-      const url = `${baseUrl}/domains`
-      const res = await fetch(url, { headers })
+      const res = await fetch(buildProxyUrl('/domains'), { headers })
 
       console.log(`📥 [API] Response status: ${res.status}`)
 
@@ -516,7 +520,7 @@ export async function createAccount(address: string, password: string, providerI
   // 使用 API Key 认证，以便在私有域名下创建账户
   const headers = createHeadersWithApiKey({ "Content-Type": "application/json" }, providerId)
 
-  const res = await fetch(`${baseUrl}/accounts`, {
+  const res = await fetch(buildProxyUrl('/accounts'), {
     method: "POST",
     headers,
     body: JSON.stringify({ address, password }),
@@ -544,7 +548,7 @@ export async function getToken(address: string, password: string, providerId?: s
     "Content-Type": "application/json",
   }
 
-  const res = await fetch(`${baseUrl}/token`, {
+  const res = await fetch(buildProxyUrl('/token'), {
     method: "POST",
     headers,
     body: JSON.stringify({ address, password }),
@@ -569,7 +573,7 @@ export async function getAccount(token: string, providerId?: string): Promise<Ac
 
   const response = await retryFetch(async () => {
     const headers = createHeadersWithToken(currentToken, {}, providerId)
-    const res = await fetchWithTokenRefresh(`${baseUrl}/me`, { headers }, providerId)
+    const res = await fetchWithTokenRefresh(buildProxyUrl('/me'), { headers }, providerId)
 
     if (!res.ok) {
       if (res.status === 401) {
@@ -577,7 +581,7 @@ export async function getAccount(token: string, providerId?: string): Promise<Ac
         if (account && account.token && account.token !== currentToken) {
           currentToken = account.token
           const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
-          const retryRes = await fetch(`${baseUrl}/me`, { headers: retryHeaders })
+          const retryRes = await fetch(buildProxyUrl('/me'), { headers: retryHeaders })
           if (retryRes.ok) return retryRes
         }
       }
@@ -598,7 +602,7 @@ export async function getMessages(token: string, page = 1, providerId?: string):
 
   const response = await retryFetch(async () => {
     const headers = createHeadersWithToken(currentToken, {}, providerId)
-    const res = await fetchWithTokenRefresh(`${baseUrl}/messages?page=${page}`, { headers }, providerId)
+    const res = await fetchWithTokenRefresh(buildProxyUrl(`/messages?page=${page}`), { headers }, providerId)
 
     if (!res.ok) {
       // 如果刷新后仍然失败，检查是否需要更新token
@@ -609,7 +613,7 @@ export async function getMessages(token: string, page = 1, providerId?: string):
           currentToken = account.token
           // 用新token重试一次
           const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
-          const retryRes = await fetch(`${baseUrl}/messages?page=${page}`, { headers: retryHeaders })
+          const retryRes = await fetch(buildProxyUrl(`/messages?page=${page}`), { headers: retryHeaders })
           if (retryRes.ok) return retryRes
         }
       }
@@ -642,7 +646,7 @@ export async function getMessage(token: string, id: string, providerId?: string)
 
   const response = await retryFetch(async () => {
     const headers = createHeadersWithToken(currentToken, {}, providerId)
-    const res = await fetchWithTokenRefresh(`${baseUrl}/messages/${id}`, { headers }, providerId)
+    const res = await fetchWithTokenRefresh(buildProxyUrl(`/messages/${id}`), { headers }, providerId)
 
     if (!res.ok) {
       if (res.status === 401) {
@@ -650,7 +654,7 @@ export async function getMessage(token: string, id: string, providerId?: string)
         if (account && account.token && account.token !== currentToken) {
           currentToken = account.token
           const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
-          const retryRes = await fetch(`${baseUrl}/messages/${id}`, { headers: retryHeaders })
+          const retryRes = await fetch(buildProxyUrl(`/messages/${id}`), { headers: retryHeaders })
           if (retryRes.ok) return retryRes
         }
       }
@@ -671,7 +675,7 @@ export async function markMessageAsRead(token: string, id: string, providerId?: 
 
   const response = await retryFetch(async () => {
     const headers = createHeadersWithToken(currentToken, { "Content-Type": "application/merge-patch+json" }, providerId)
-    const res = await fetchWithTokenRefresh(`${baseUrl}/messages/${id}`, {
+    const res = await fetchWithTokenRefresh(buildProxyUrl(`/messages/${id}`), {
       method: "PATCH",
       headers,
       body: JSON.stringify({ seen: true }),
@@ -683,7 +687,7 @@ export async function markMessageAsRead(token: string, id: string, providerId?: 
         if (account && account.token && account.token !== currentToken) {
           currentToken = account.token
           const retryHeaders = createHeadersWithToken(currentToken, { "Content-Type": "application/merge-patch+json" }, providerId)
-          const retryRes = await fetch(`${baseUrl}/messages/${id}`, { method: "PATCH", headers: retryHeaders, body: JSON.stringify({ seen: true }) })
+          const retryRes = await fetch(buildProxyUrl(`/messages/${id}`), { method: "PATCH", headers: retryHeaders, body: JSON.stringify({ seen: true }) })
           if (retryRes.ok) {
             if (retryRes.headers.get("content-type")?.includes("application/json")) {
               return retryRes.json()
@@ -712,7 +716,7 @@ export async function deleteMessage(token: string, id: string, providerId?: stri
 
   await retryFetch(async () => {
     const headers = createHeadersWithToken(currentToken, {}, providerId)
-    const res = await fetchWithTokenRefresh(`${baseUrl}/messages/${id}`, {
+    const res = await fetchWithTokenRefresh(buildProxyUrl(`/messages/${id}`), {
       method: "DELETE",
       headers,
     }, providerId)
@@ -723,7 +727,7 @@ export async function deleteMessage(token: string, id: string, providerId?: stri
         if (account && account.token && account.token !== currentToken) {
           currentToken = account.token
           const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
-          const retryRes = await fetch(`${baseUrl}/messages/${id}`, { method: "DELETE", headers: retryHeaders })
+          const retryRes = await fetch(buildProxyUrl(`/messages/${id}`), { method: "DELETE", headers: retryHeaders })
           if (retryRes.ok) return retryRes
         }
       }
@@ -742,7 +746,7 @@ export async function deleteAccount(token: string, id: string, providerId?: stri
 
   await retryFetch(async () => {
     const headers = createHeadersWithToken(currentToken, {}, providerId)
-    const res = await fetchWithTokenRefresh(`${baseUrl}/accounts/${id}`, {
+    const res = await fetchWithTokenRefresh(buildProxyUrl(`/accounts/${id}`), {
       method: "DELETE",
       headers,
     }, providerId)
@@ -753,7 +757,7 @@ export async function deleteAccount(token: string, id: string, providerId?: stri
         if (account && account.token && account.token !== currentToken) {
           currentToken = account.token
           const retryHeaders = createHeadersWithToken(currentToken, {}, providerId)
-          const retryRes = await fetch(`${baseUrl}/accounts/${id}`, { method: "DELETE", headers: retryHeaders })
+          const retryRes = await fetch(buildProxyUrl(`/accounts/${id}`), { method: "DELETE", headers: retryHeaders })
           if (retryRes.ok) return retryRes
         }
       }

@@ -6,8 +6,6 @@ import { Button } from "@heroui/button"
 import { ArrowLeft, HelpCircle, Languages } from "lucide-react"
 import { useTranslations, useLocale } from "next-intl"
 import { useRouter, usePathname } from "@/i18n/navigation"
-import { AdSenseBanner } from "@/components/adsense-banner"
-import { useIsMobile } from "@/hooks/use-mobile"
 
 export default function FaqPage() {
   const router = useRouter()
@@ -15,7 +13,6 @@ export default function FaqPage() {
   const t = useTranslations("faqSection")
   const tc = useTranslations("common")
   const locale = useLocale()
-  const isMobile = useIsMobile()
   const [isPending, startTransition] = useTransition()
 
   const toggleLocale = () => {
@@ -96,9 +93,6 @@ export default function FaqPage() {
               </div>
             </section>
 
-            {/* 广告位 1 */}
-            {!isMobile && <AdSenseBanner />}
-
             {/* 三步指南 */}
             <section>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 border-l-4 border-violet-500 pl-4">
@@ -129,9 +123,6 @@ export default function FaqPage() {
                 ))}
               </div>
             </section>
-
-            {/* 广告位 2 */}
-            {!isMobile && <AdSenseBanner />}
 
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
