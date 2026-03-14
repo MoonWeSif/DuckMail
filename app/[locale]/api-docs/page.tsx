@@ -54,7 +54,7 @@ const ApiEndpointCard = ({ endpoint, t }: { endpoint: any; t: any }) => {
     pathParams.forEach((param: any) => {
       urlPath = urlPath.replace(`{${param.name}}`, param.value)
     })
-    const url = `https://api.duckmail.sbs${urlPath}`
+    const url = `/api/mail?endpoint=${encodeURIComponent(urlPath)}`
 
     const headers: any = { "Content-Type": "application/json" }
     if (endpoint.authType === "optional-apikey" && apiKey) {
