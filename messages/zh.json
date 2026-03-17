@@ -45,7 +45,8 @@
     "deleteCurrent": "删除当前账户",
     "loginExisting": "登录现有账户",
     "accountSwitchFailed": "切换账户失败",
-    "accountSwitchFailedDesc": "请尝试重新登录该账户"
+    "accountSwitchFailedDesc": "请尝试重新登录该账户",
+    "passwordCopied": "密码已复制"
   },
   "sidebar": {
     "inbox": "收件箱",
@@ -219,7 +220,7 @@
   },
   "mainPage": {
     "tempMailCreated": "已为你创建临时邮箱",
-    "checkBanner": "请在顶部横幅中查看并保存账户信息",
+    "checkBanner": "点击右上角头像可查看密码，密码无法找回请妥善保管",
     "createFailed": "自动创建临时邮箱失败",
     "createFailedDesc": "请稍后重试，或者手动创建一个邮箱账号。",
     "switchedToZh": "已切换到中文",

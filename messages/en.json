@@ -45,7 +45,8 @@
     "deleteCurrent": "Delete Current Account",
     "loginExisting": "Login Existing Account",
     "accountSwitchFailed": "Account Switch Failed",
-    "accountSwitchFailedDesc": "Please try logging in to this account again"
+    "accountSwitchFailedDesc": "Please try logging in to this account again",
+    "passwordCopied": "Password copied"
   },
   "sidebar": {
     "inbox": "Inbox",
@@ -219,7 +220,7 @@
   },
   "mainPage": {
     "tempMailCreated": "Temporary email created",
-    "checkBanner": "Check and save your account info in the banner above",
+    "checkBanner": "Click avatar to view password. Password cannot be recovered, please save it",
     "createFailed": "Failed to create temporary email",
     "createFailedDesc": "Please try again later or create an account manually.",
     "switchedToZh": "已切换到中文",

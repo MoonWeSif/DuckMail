@@ -4,7 +4,7 @@ import { Button } from "@heroui/button"
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection } from "@heroui/dropdown"
 import { Avatar } from "@heroui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Sun, Moon, Languages, User, UserPlus, LogOut, Trash2, Copy, Check, Wifi, Settings } from "lucide-react"
+import { Sun, Moon, Languages, User, UserPlus, LogOut, Trash2, Copy, Check, Wifi, Settings, Eye, EyeOff, KeyRound } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
@@ -25,6 +25,8 @@ export default function Header({ onCreateAccount, onLocaleChange, onLogin, isMob
   const { isAuthenticated, currentAccount, accounts, logout, switchAccount, deleteAccount } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
+  const [copiedPassword, setCopiedPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { toast } = useHeroUIToast()
   const { isEnabled, setIsEnabled } = useMailStatus()
@@ -213,6 +215,54 @@ export default function Header({ onCreateAccount, onLocaleChange, onLogin, isMob
                       {currentAccount.address}
                     </div>
                   </DropdownItem>
+                  {currentAccount.password ? (
+                    <DropdownItem
+                      key="current-password"
+                      textValue="password"
+                      isReadOnly
+                      className="py-2 cursor-default"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <KeyRound size={14} className="text-gray-400 flex-shrink-0" />
+                          <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                            {showPassword ? currentAccount.password : "••••••••••••"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setShowPassword(!showPassword)
+                            }}
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            {showPassword ? (
+                              <EyeOff size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
+                            ) : (
+                              <Eye size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigator.clipboard.writeText(currentAccount.password!)
+                              setCopiedPassword(true)
+                              toast({ title: t("passwordCopied") })
+                              setTimeout(() => setCopiedPassword(false), 2000)
+                            }}
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            {copiedPassword ? (
+                              <Check size={14} className="text-green-500" />
+                            ) : (
+                              <Copy size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </DropdownItem>
+                  ) : null}
                 </DropdownSection>
               ] : []),
 
