@@ -194,7 +194,7 @@ export default function Header({ onCreateAccount, onLocaleChange, onLogin, isMob
               )}
             </Button>
           </DropdownTrigger>
-          <DropdownMenu aria-label="User actions">
+          <DropdownMenu aria-label="User actions" className="max-h-[70vh] overflow-y-auto">
             {[
               ...(isAuthenticated && currentAccount ? [
                 <DropdownSection key="current-account" title={t("currentAccount")} showDivider>
