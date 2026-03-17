@@ -17,16 +17,12 @@
 - 🔒 **Secure & Reliable** - Built on Mail.tm's reliable infrastructure
 - ⚡ **Instant Access** - Get temporary email addresses instantly
 - 🌐 **Multi-language Support** - Supports Chinese and English, automatic browser language detection
-- 📱 **Responsive Design** - Perfect for both desktop and mobile devices
 - 🎨 **Modern UI** - Beautiful design based on HeroUI components
 - 🔄 **Real-time Updates** - Supports Mercure SSE for real-time message notifications
 - 🌙 **Dark Mode** - Light and dark theme support
 - 📧 **Multi-account Management** - Create and manage multiple temporary email accounts
 - 🔧 **Multi-API Provider** - Support switching between DuckMail API and Mail.tm API
-- 🎯 **Smart Error Handling** - Elegant error messages and automatic retry mechanisms
-- 🔗 **Open Source** - Fully open source with community contributions
-- 🔧 **Multi-API Provider** - Support switching between DuckMail API and Mail.tm API
-- 🎯 **Smart Error Handling** - Elegant error messages and automatic retry mechanisms
+- 🔑 **API Key Support** - Optional API Key configuration for more domain choices and private domain access
 - 🔗 **Open Source** - Fully open source with community contributions
 
 ## 📸 Screenshots
@@ -61,100 +57,44 @@ Click the button below to deploy to Vercel with one click:
 >
 > 🚀 **Zero Configuration**: Vercel automatically detects Next.js projects and uses optimal configuration for deployment.
 
-### Local Development
-
-#### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-
-#### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/moonwesif/duckmail.git
-cd duckmail
-
-# Install dependencies
-npm install
-# or
-pnpm install
-```
-
-### Development
-
-```bash
-# Start development server
-npm run dev
-# or
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to view the application.
-
-### Production Build
-
-```bash
-# Build for production
-npm run build
-npm start
-
-# or
-pnpm build
-pnpm start
-```
-
-## 🛠️ Tech Stack
-
-- **Frontend Framework**: Next.js 15
-- **UI Component Library**: HeroUI
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
-- **API**: Mail.tm REST API / DuckMail API
-- **Real-time Communication**: Mercure SSE
-- **Language**: TypeScript
-
-## 🌐 Deployment Guide
-
-### Platform Compatibility
-
-| Platform | DuckMail API | Mail.tm API | Rating |
-|----------|-------------|-------------|--------|
-| **Netlify** | ✅ Supported | ✅ Supported | ⭐⭐⭐⭐⭐ |
-| **Vercel** | ✅ Supported | ❌ Not Supported* | ⭐⭐⭐⭐ |
-| **Other Platforms** | ✅ Supported | ✅ Supported | ⭐⭐⭐ |
-
-> *Mail.tm blocks Vercel's IP addresses, so Vercel deployment cannot use Mail.tm API.
-
-### Deployment Recommendations
-
-- **Full Features**: Recommended to use **Netlify**, supports all API providers
-- **Quick Deploy**: Can use **Vercel**, but need to disable Mail.tm provider in settings
-
 ## 📧 API Documentation
 
-This project uses the free API service provided by [Mail.tm](https://mail.tm):
+This project uses DuckMail's self-hosted email backend server, supporting the following operations:
 
 - **Account Management**: Create and login to temporary email accounts
 - **Email Reception**: Real-time email receiving and viewing
 - **Domain Retrieval**: Get available email domains
 - **Real-time Notifications**: Real-time message push via Mercure Hub
 
+Visit https://www.duckmail.sbs/en/api-docs for API documentation and debugging interface.
+
+### API Key Feature (Optional)
+
+The application supports optional API Key configuration for enhanced features:
+
+- **Without API Key**: Use public domains, all basic features fully available
+- **With API Key**: Access more domain choices and private domain creation permissions
+
+**Configuration**:
+1. Click the settings button in the top right corner
+2. Enter your API Key in the "API Key Settings" area
+3. Click save to apply
+
+#### How to Get an API Key
+1. Visit https://domain.duckmail.sbs
+2. Log in via LinuxDo authentication
+3. Click the API Key option in the sidebar, create a new API Key
+
 ### API Limitations
 
-- Rate Limit: 8 QPS
-- Email Validity: According to Mail.tm policy
+- Rate Limit: 50 QPS. For special needs (such as public welfare purposes), please apply for a higher quota via email.
+- Email Validity: Emails are retained for three days, then automatically deleted. Accounts are not deleted and can still be logged in with the same credentials to receive codes.
 - No password recovery functionality
 
-## 🤝 Contributing
+#### About Authentication
 
-Contributions are welcome! Please follow these steps:
-
-1. Fork the project
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Create a Pull Request
+1. All endpoints can be used without an API Key. When creating an email account, you will receive a token for authentication of email-related operations.
+2. The Domains and Accounts endpoints support an additional API Key Header for authentication. With an API Key, you can access private domains under that key and create new email accounts using private domains. All other operations remain the same.
 
 ## 📄 License
 
@@ -163,9 +103,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [Mail.tm](https://mail.tm) - For providing free and reliable temporary email API service
-- [HeroUI](https://heroui.com) - Modern React UI component library
-- [Next.js](https://nextjs.org) - Powerful React framework
-- [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework
 
 ## 📞 Contact
 
@@ -176,7 +113,7 @@ If you have any questions or suggestions, please contact us through:
 
 ## 💖 Sponsor
 
-If this project helps you, welcome to sponsor and support the developer to continue maintaining and improving the project:
+If this project helps you, welcome to sponsor and support the developer to continue maintaining and improving the project. The backend costs are significant, and your support will help the project's continued development:
 
 [![爱发电](https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-syferie-946ce6?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K)](https://afdian.com/a/syferie)
 
