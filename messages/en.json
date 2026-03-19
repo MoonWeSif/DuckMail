@@ -120,7 +120,14 @@
     "createFailed": "Failed to create account, please try again later",
     "creationFailed": "Account Creation Failed",
     "tryLogin": "Try Login",
-    "loginFailed": "Login failed. Please check your password or try creating a new account with a different username."
+    "loginFailed": "Login failed. Please check your password or try creating a new account with a different username.",
+    "expiresLabel": "Account Expiry",
+    "expiresNever": "Never expires",
+    "expires1h": "1 hour",
+    "expires6h": "6 hours",
+    "expires24h": "24 hours",
+    "expires3d": "3 days",
+    "expires7d": "7 days"
   },
   "loginModal": {
     "title": "Login Account",
@@ -323,7 +330,7 @@
     "domainGroup": "Domains",
     "domainGetDesc": "Get the list of available domains. Private domains are returned if an API key is provided.",
     "accountGroup": "Accounts",
-    "accountCreateDesc": "Create a new email account. An API key is required if using a private domain.",
+    "accountCreateDesc": "Create a new email account. Optional expiresIn parameter sets account lifetime in seconds (0 or -1 = never expires, omit = 24h default). An API key is required if using a private domain.",
     "accountMeDesc": "Get information about the currently authenticated account.",
     "accountDeleteDesc": "Delete the currently authenticated email account by ID. You can only delete your own account.",
     "authGroup": "Authentication",

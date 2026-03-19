@@ -7,7 +7,7 @@ import { createAccount, getToken, getAccount, deleteAccount as deleteAccountApi 
 interface AuthContextType extends AuthState {
   login: (address: string, password: string) => Promise<void>
   logout: () => void
-  register: (address: string, password: string) => Promise<void>
+  register: (address: string, password: string, expiresIn?: number) => Promise<void>
   deleteAccount: (id: string) => Promise<void>
   switchAccount: (account: Account) => Promise<void>
   addAccount: (account: Account, token: string, password?: string) => void
@@ -167,10 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const register = async (address: string, password: string) => {
+  const register = async (address: string, password: string, expiresIn?: number) => {
     try {
       const providerId = getProviderIdFromEmail(address)
-      await createAccount(address, password, providerId)
+      await createAccount(address, password, providerId, expiresIn)
       // 注册成功后直接登录
       await login(address, password)
     } catch (error) {

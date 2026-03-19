@@ -186,7 +186,7 @@ export default function ApiDocsPage() {
       endpoints: [
         {
           method: "POST", path: "/accounts", description: t("accountCreateDesc"), authType: "optional-apikey",
-          body: `{\n  "address": "user@duckmail.sbs",\n  "password": "your_password"\n}`,
+          body: `{\n  "address": "user@duckmail.sbs",\n  "password": "your_password",\n  "expiresIn": 0\n}`,
         },
         { method: "GET", path: "/me", description: t("accountMeDesc"), authType: "required-token" },
         { method: "DELETE", path: "/accounts/{id}", description: t("accountDeleteDesc"), authType: "required-token", pathParams: [{ name: "id", value: "" }] },

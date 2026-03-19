@@ -7,6 +7,7 @@ import { Input } from "@heroui/input"
 
 import { useAuth } from "@/contexts/auth-context"
 import { DomainSelector } from "@/components/domain-selector"
+import { Select, SelectItem } from "@heroui/select"
 import { Eye, EyeOff, User, AlertCircle } from "lucide-react"
 import { Card, CardBody } from "@heroui/card"
 import { useTranslations } from "next-intl"
@@ -24,6 +25,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [showLoginOption, setShowLoginOption] = useState(false)
+  const [expiresIn, setExpiresIn] = useState<string>("0") // 默认不过期
   const { register, login } = useAuth()
   const t = useTranslations("accountModal")
   const tc = useTranslations("common")
@@ -41,10 +43,11 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
     const email = `${username}@${selectedDomain}`
 
     try {
-      await register(email, password)
+      await register(email, password, Number(expiresIn))
       onClose()
       setUsername("")
       setPassword("")
+      setExpiresIn("0")
       setError(null)
       setShowLoginOption(false)
     } catch (error: any) {
@@ -152,6 +155,28 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   </button>
                 }
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t("expiresLabel")}
+              </label>
+              <Select
+                selectedKeys={[expiresIn]}
+                onSelectionChange={(keys) => {
+                  const value = Array.from(keys)[0] as string
+                  if (value) setExpiresIn(value)
+                }}
+                isDisabled={isLoading}
+                aria-label={t("expiresLabel")}
+              >
+                <SelectItem key="0">{t("expiresNever")}</SelectItem>
+                <SelectItem key="3600">{t("expires1h")}</SelectItem>
+                <SelectItem key="21600">{t("expires6h")}</SelectItem>
+                <SelectItem key="86400">{t("expires24h")}</SelectItem>
+                <SelectItem key="259200">{t("expires3d")}</SelectItem>
+                <SelectItem key="604800">{t("expires7d")}</SelectItem>
+              </Select>
             </div>
 
             <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">

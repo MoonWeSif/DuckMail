@@ -508,7 +508,8 @@ export async function fetchDomains(): Promise<Domain[]> {
 }
 
 // 创建账户（需要 API Key 来在私有域名下创建账户）
-export async function createAccount(address: string, password: string, providerId?: string): Promise<Account> {
+// expiresIn: 账户有效期（秒）。0 或 -1 = 永不过期，undefined = 服务端默认 24h，正数 = 自定义秒数
+export async function createAccount(address: string, password: string, providerId?: string, expiresIn?: number): Promise<Account> {
   // 如果没有指定providerId，尝试从邮箱地址推断
   if (!providerId) {
     providerId = inferProviderFromEmail(address)
@@ -520,10 +521,16 @@ export async function createAccount(address: string, password: string, providerI
   // 使用 API Key 认证，以便在私有域名下创建账户
   const headers = createHeadersWithApiKey({ "Content-Type": "application/json" }, providerId)
 
+  // 构建请求体，仅在指定 expiresIn 时才传递该字段
+  const requestBody: Record<string, any> = { address, password }
+  if (expiresIn !== undefined) {
+    requestBody.expiresIn = expiresIn
+  }
+
   const res = await fetch(buildProxyUrl('/accounts'), {
     method: "POST",
     headers,
-    body: JSON.stringify({ address, password }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!res.ok) {

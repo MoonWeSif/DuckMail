@@ -120,7 +120,14 @@
     "createFailed": "创建账户失败，请稍后再试",
     "creationFailed": "账户创建失败",
     "tryLogin": "尝试登录",
-    "loginFailed": "登录失败。请检查您的密码或尝试使用不同的用户名创建新账户。"
+    "loginFailed": "登录失败。请检查您的密码或尝试使用不同的用户名创建新账户。",
+    "expiresLabel": "账户有效期",
+    "expiresNever": "永不过期",
+    "expires1h": "1 小时",
+    "expires6h": "6 小时",
+    "expires24h": "24 小时",
+    "expires3d": "3 天",
+    "expires7d": "7 天"
   },
   "loginModal": {
     "title": "登录账户",
@@ -323,7 +330,7 @@
     "domainGroup": "域名",
     "domainGetDesc": "获取可用域名列表。如果提供了 API 密钥，将同时返回私有域名。",
     "accountGroup": "账户",
-    "accountCreateDesc": "创建一个新的邮箱账户。如果使用私有域名，则需要提供 API 密钥。",
+    "accountCreateDesc": "创建一个新的邮箱账户。可选 expiresIn 参数设置有效期（秒），0 或 -1 表示永不过期，不传则默认 24 小时。如果使用私有域名，则需要提供 API 密钥。",
     "accountMeDesc": "获取当前已认证账户的信息。",
     "accountDeleteDesc": "通过 ID 删除当前已认证的邮箱账户。只能删除当前登录的账户。",
     "authGroup": "认证",

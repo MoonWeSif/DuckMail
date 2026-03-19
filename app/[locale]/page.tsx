@@ -88,7 +88,8 @@ function MainContent() {
       const email = `${username}@${domain}`
 
       try {
-        await register(email, password)
+        // 一键创建的临时邮箱默认不过期
+        await register(email, password, 0)
 
         toast({
           title: t("tempMailCreated"),
