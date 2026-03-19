@@ -52,8 +52,13 @@ Auth: Optional (API Key or Bearer Token)
 Request:
 {
   "address": "user@duckmail.sbs",
-  "password": "your_password"
+  "password": "your_password",
+  "expiresIn": 86400
 }
+Fields:
+- address (required): email address. Username (before @) >= 3 chars, domain must be verified.
+- password (required): >= 6 chars.
+- expiresIn (optional, integer, seconds): Account expiry. Omit = 24h auto-cleanup. 0 or -1 = never expires. Positive number = custom expiry in seconds.
 Validation: address must contain @, username (before @) >= 3 chars, password >= 6 chars, domain must be verified.
 Response (201):
 {
@@ -199,10 +204,10 @@ Status codes:
 
 ## Quick Start Example
 
-# 1. Create account
+# 1. Create account (expiresIn: omit=24h, 0/-1=never, >0=custom seconds)
 curl -X POST https://api.duckmail.sbs/accounts \
   -H "Content-Type: application/json" \
-  -d '{"address": "test@duckmail.sbs", "password": "mypassword"}'
+  -d '{"address": "test@duckmail.sbs", "password": "mypassword", "expiresIn": 0}'
 
 # 2. Get token
 curl -X POST https://api.duckmail.sbs/token \

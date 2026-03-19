@@ -87,8 +87,9 @@ The application supports optional API Key configuration for enhanced features:
 
 ### API Limitations
 
-- Rate Limit: 50 QPS. For special needs (such as public welfare purposes), please apply for a higher quota via email.
-- Email Validity: Emails are retained for three days, then automatically deleted. Accounts are not deleted and can still be logged in with the same credentials to receive codes.
+- Rate Limit: 12 QPS. For special needs (such as public welfare purposes), please apply for a higher quota via email.
+- Email Validity: Emails are retained for three days, then automatically deleted.
+- Account Validity: When creating accounts via API, set `expiresIn` parameter (seconds). `0` or `-1` = never expires, omit = defaults to 24 hours auto-cleanup. Accounts created via web UI default to never expire.
 - No password recovery functionality
 
 #### About Authentication
