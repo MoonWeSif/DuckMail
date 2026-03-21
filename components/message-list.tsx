@@ -75,6 +75,7 @@ export default function MessageList({ onSelectMessage, refreshKey }: MessageList
     onMessagesUpdate: handleMessagesUpdate,
     interval: 2000,
     enabled: isEnabled,
+    startImmediately: false,
   })
 
   // 初始加载
