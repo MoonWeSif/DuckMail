@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png" alt="DuckMail Logo" width="120" height="120">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./public/images/duckmail-logo-on-dark.png">
+    <img src="./public/images/duckmail-logo.png" alt="DuckMail Logo" width="160">
+  </picture>
 
   # DuckMail - 临时邮件服务
 

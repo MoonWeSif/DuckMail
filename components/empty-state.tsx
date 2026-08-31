@@ -2,6 +2,7 @@
 
 import { Button } from "@heroui/button"
 import { useTranslations } from "next-intl"
+import { DUCKMAIL_LOGO_PATH } from "@/lib/brand"
 
 interface EmptyStateProps {
   onCreateAccount: () => void
@@ -15,9 +16,9 @@ export default function EmptyState({ onCreateAccount, isAuthenticated, isCreatin
   return (
     <div className="flex flex-col items-center justify-center h-full py-12">
       <div className="mb-6">
-        <div className="w-32 h-32 mx-auto flex items-center justify-center">
+        <div className="w-32 h-32 mx-auto flex items-center justify-center rounded-2xl bg-white p-2 shadow-sm">
           <img
-            src="https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png"
+            src={DUCKMAIL_LOGO_PATH}
             alt="DuckMail Logo"
             className="w-full h-full object-contain"
           />

@@ -4,6 +4,7 @@ import { Button } from "@heroui/button"
 import { Card } from "@heroui/card"
 import { Mail, RefreshCw, Code, HelpCircle, MessageSquare, ExternalLink, Bell } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { DUCKMAIL_LOGO_PATH } from "@/lib/brand"
 
 interface SidebarProps {
   activeItem: string
@@ -32,9 +33,9 @@ export default function Sidebar({ activeItem, onItemClick, isMobile = false }: S
       {!isMobile && (
         <div className="p-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
               <img
-                src="https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png"
+                src={DUCKMAIL_LOGO_PATH}
                 alt="DuckMail Logo"
                 className="w-full h-full object-contain"
               />

@@ -20,6 +20,7 @@ import { useTranslations, useLocale } from "next-intl"
 import { useRouter, usePathname } from "@/i18n/navigation"
 import { CheckCircle, Navigation, RefreshCw, Menu, AlertCircle, Languages } from "lucide-react"
 import { Button } from "@heroui/button"
+import { DUCKMAIL_LOGO_PATH } from "@/lib/brand"
 
 // 生成随机字符串，用于用户名和密码
 function generateRandomString(length: number) {
@@ -259,9 +260,9 @@ function MainContent() {
                 <Menu size={20} />
               </Button>
               <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
                   <img
-                    src="https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png"
+                    src={DUCKMAIL_LOGO_PATH}
                     alt="DuckMail Logo"
                     className="w-full h-full object-contain"
                   />
@@ -325,9 +326,9 @@ function MainContent() {
               <div className="p-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
                       <img
-                        src="https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png"
+                        src={DUCKMAIL_LOGO_PATH}
                         alt="DuckMail Logo"
                         className="w-full h-full object-contain"
                       />

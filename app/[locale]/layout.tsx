@@ -7,6 +7,7 @@ import { routing } from "@/i18n/routing"
 import { notFound } from "next/navigation"
 import "../globals.css"
 import { Providers } from "./providers"
+import { DUCKMAIL_LOGO_PATH } from "@/lib/brand"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -31,9 +32,9 @@ export async function generateMetadata({
       ? "使用 DuckMail 保护您的个人邮箱地址免受垃圾邮件、机器人、钓鱼和其他在线滥用——安全的临时邮件服务。"
       : "Protect your personal email address from spam, bots, phishing and other online abuse with DuckMail - secure temporary email service.",
     icons: {
-      icon: "https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png",
-      shortcut: "https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png",
-      apple: "https://img.116119.xyz/img/2025/06/08/547d9cd9739b8e15a51e510342af3fb0.png",
+      icon: DUCKMAIL_LOGO_PATH,
+      shortcut: DUCKMAIL_LOGO_PATH,
+      apple: DUCKMAIL_LOGO_PATH,
     },
     alternates: {
       languages: {
