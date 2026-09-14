@@ -131,6 +131,9 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
   const localeDate = locale === "en" ? enUS : zhCN
 
   useEffect(() => {
+    // 请求期间切换了邮件 / 账号时，丢弃旧请求的结果
+    let cancelled = false
+
     const fetchMessageDetail = async () => {
       if (!token) {
         setError(t("authError"))
@@ -142,21 +145,32 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
         setLoading(true)
         const providerId = currentAccount?.providerId || "duckmail"
         const detail = await getMessage(token, message.id, providerId)
+        if (cancelled) return
         setMessageDetail(detail)
+        setError(null)
 
         if (!message.seen) {
-          await markMessageAsRead(token, message.id, providerId)
+          // 标记已读失败不应影响详情展示
+          markMessageAsRead(token, message.id, providerId).catch((err) => {
+            console.warn("Failed to mark message as read:", err)
+          })
         }
-        setError(null)
       } catch (err) {
+        if (cancelled) return
         console.error("Failed to fetch message detail:", err)
         setError(t("fetchError"))
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     fetchMessageDetail()
+
+    return () => {
+      cancelled = true
+    }
   }, [token, message.id, message.seen, t])
 
   const handleDelete = async () => {

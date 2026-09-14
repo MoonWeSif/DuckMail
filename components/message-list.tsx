@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardBody } from "@heroui/card"
 import { Spinner } from "@heroui/spinner"
 import { Avatar } from "@heroui/avatar"
@@ -31,6 +31,9 @@ export default function MessageList({ onSelectMessage, refreshKey }: MessageList
   const isMobile = useIsMobile()
   const t = useTranslations("messageList")
   const locale = useLocale()
+  // 请求序号：切换账号 / 手动刷新时递增，只有最新一次请求的结果才允许写入状态，
+  // 避免上一个账号仍在飞的请求（成功或失败）覆盖当前账号的数据
+  const loadSeqRef = useRef(0)
 
   // 处理新消息通知
   const handleNewMessage = useCallback((message: Message) => {
@@ -56,17 +59,22 @@ export default function MessageList({ onSelectMessage, refreshKey }: MessageList
   const manualRefresh = useCallback(async () => {
     if (!token || !currentAccount) return
 
+    const seq = ++loadSeqRef.current
     try {
       setLoading(true)
       const providerId = currentAccount.providerId || "duckmail"
       const { messages: fetchedMessages } = await getMessages(token, 1, providerId)
+      if (seq !== loadSeqRef.current) return
       setMessages(fetchedMessages || [])
       setError(null)
     } catch (err) {
+      if (seq !== loadSeqRef.current) return
       console.error("Failed to refresh messages:", err)
       setError(t("refreshError"))
     } finally {
-      setLoading(false)
+      if (seq === loadSeqRef.current) {
+        setLoading(false)
+      }
     }
   }, [token, currentAccount, t])
 
@@ -80,28 +88,43 @@ export default function MessageList({ onSelectMessage, refreshKey }: MessageList
 
   // 初始加载
   useEffect(() => {
+    // 每次账号 / token 变化都开启一轮新的加载，旧请求的结果在返回后会被序号校验丢弃
+    const seq = ++loadSeqRef.current
+
     const fetchInitialMessages = async () => {
       if (!token || !currentAccount) {
         console.log("📥 [MessageList] No token or account, clearing messages")
         setMessages([])
+        setError(null)
         setLoading(false)
         return
       }
 
       try {
         setLoading(true)
+        setError(null)
         console.log(`📥 [MessageList] Loading initial messages for account: ${currentAccount.address}`)
         const providerId = currentAccount.providerId || "duckmail"
         const { messages: fetchedMessages } = await getMessages(token, 1, providerId)
+        if (seq !== loadSeqRef.current) {
+          console.log(`📥 [MessageList] Ignoring stale result for account: ${currentAccount.address}`)
+          return
+        }
         setMessages(fetchedMessages || [])
         setError(null)
         console.log(`📥 [MessageList] Loaded ${fetchedMessages?.length || 0} initial messages`)
       } catch (err) {
+        if (seq !== loadSeqRef.current) {
+          console.log(`📥 [MessageList] Ignoring stale error for account: ${currentAccount.address}`)
+          return
+        }
         console.error("Failed to fetch messages:", err)
         setError(t("fetchError"))
         setMessages([])
       } finally {
-        setLoading(false)
+        if (seq === loadSeqRef.current) {
+          setLoading(false)
+        }
       }
     }
 

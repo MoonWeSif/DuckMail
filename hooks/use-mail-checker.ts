@@ -92,6 +92,13 @@ export function useMailChecker({
       try {
         const providerId = currentAccount.providerId || "duckmail"
         const { messages } = await getMessages(token, 1, providerId)
+
+        // 请求期间账号 / token 已变化（effect 已被清理）：这批数据属于旧账号，直接丢弃，
+        // 不能写入 lastMessagesRef 或触发回调，否则会在新账号下显示旧邮件并误报"新邮件"
+        if (cancelled) {
+          return
+        }
+
         const currentMessages = messages || []
 
         if (!isInitializedRef.current) {
@@ -120,10 +127,15 @@ export function useMailChecker({
 
         lastMessagesRef.current = currentMessages
       } catch (error) {
-        console.error("❌ [MailChecker] Failed to check for new messages:", error)
+        if (!cancelled) {
+          console.error("❌ [MailChecker] Failed to check for new messages:", error)
+        }
       } finally {
-        isCheckingRef.current = false
-        scheduleNextCheck(interval)
+        // 已取消时不要重置 isCheckingRef：cleanup 已经重置过，此时它可能已属于新账号正在进行的检查
+        if (!cancelled) {
+          isCheckingRef.current = false
+          scheduleNextCheck(interval)
+        }
       }
     }
 

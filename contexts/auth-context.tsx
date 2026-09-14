@@ -83,28 +83,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 监听token刷新事件，同步更新React state
   useEffect(() => {
-    const handleTokenRefreshed = (event: CustomEvent<{ token: string }>) => {
-      const newToken = event.detail.token
-      console.log("🔄 [Auth] Token refreshed event received, updating React state")
+    const handleTokenRefreshed = (event: CustomEvent<{ token: string; address?: string }>) => {
+      const { token: newToken, address } = event.detail
+      if (!newToken) return
+      console.log(`🔄 [Auth] Token refreshed event received for ${address ?? "(unknown)"}, updating React state`)
 
       setAuthState(prev => {
-        if (!prev.currentAccount) return prev
-
-        const updatedCurrentAccount = {
-          ...prev.currentAccount,
-          token: newToken,
-        }
+        // 兼容旧事件（无 address）：视为当前账户
+        const targetAddress = address ?? prev.currentAccount?.address
+        if (!targetAddress) return prev
 
         const updatedAccounts = prev.accounts.map(acc =>
-          acc.address === prev.currentAccount?.address
-            ? { ...acc, token: newToken }
-            : acc
+          acc.address === targetAddress ? { ...acc, token: newToken } : acc
         )
+
+        // 刷新的是其他账户（例如切换账号后旧请求才完成刷新）：只更新账户列表，不动当前登录态
+        if (!prev.currentAccount || prev.currentAccount.address !== targetAddress) {
+          return { ...prev, accounts: updatedAccounts }
+        }
 
         return {
           ...prev,
           token: newToken,
-          currentAccount: updatedCurrentAccount,
+          currentAccount: { ...prev.currentAccount, token: newToken },
           accounts: updatedAccounts,
         }
       })
@@ -141,25 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         providerId,
       }
 
-      // 检查账户是否已存在
-      const existingAccountIndex = authState.accounts.findIndex((acc) => acc.address === account.address)
+      // 使用函数式更新，避免请求期间发生的其他状态变更（如 token 刷新）被闭包中的旧快照覆盖
+      setAuthState(prev => {
+        const exists = prev.accounts.some((acc) => acc.address === account.address)
+        const updatedAccounts = exists
+          ? prev.accounts.map((acc) => (acc.address === account.address ? accountWithAuth : acc))
+          : [...prev.accounts, accountWithAuth]
 
-      let updatedAccounts: Account[]
-      if (existingAccountIndex !== -1) {
-        // 更新现有账户的信息
-        updatedAccounts = authState.accounts.map((acc, index) =>
-          index === existingAccountIndex ? accountWithAuth : acc
-        )
-      } else {
-        // 添加新账户
-        updatedAccounts = [...authState.accounts, accountWithAuth]
-      }
-
-      setAuthState({
-        token,
-        currentAccount: accountWithAuth,
-        accounts: updatedAccounts,
-        isAuthenticated: true,
+        return {
+          token,
+          currentAccount: accountWithAuth,
+          accounts: updatedAccounts,
+          isAuthenticated: true,
+        }
       })
     } catch (error) {
       console.error("Login failed:", error)
@@ -305,6 +300,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("缺少登录凭据，请重新登录")
       }
 
+      // 防御：/me 返回的账户地址必须与目标账户一致，否则说明 token 串号，按 token 无效处理
+      const assertSameAccount = (fetched: Account) => {
+        if (fetched?.address && fetched.address.toLowerCase() !== account.address.toLowerCase()) {
+          throw new Error(`Account mismatch: expected ${account.address}, got ${fetched.address}`)
+        }
+      }
+
       const applyAccountWithAuth = (accountWithAuth: Account, token: string) => {
         setAuthState(prev => {
           const updatedAccounts = prev.accounts.map((acc) =>
@@ -325,6 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // 先尝试用现有 token 获取账户信息
           const updatedAccount = await getAccount(account.token, accountProviderId)
+          assertSameAccount(updatedAccount)
           const accountWithAuth = {
             ...updatedAccount,
             password: account.password,
@@ -344,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.log(`🔑 [Auth] Token invalid, getting fresh token for account: ${account.address}`)
               const { token } = await getToken(account.address, account.password, accountProviderId)
               const updatedAccount = await getAccount(token, accountProviderId)
+              assertSameAccount(updatedAccount)
 
               const accountWithAuth = {
                 ...updatedAccount,
@@ -389,6 +393,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log(`🔑 [Auth] Getting token for account: ${account.address}`)
           const { token } = await getToken(account.address, account.password, accountProviderId)
           const updatedAccount = await getAccount(token, accountProviderId)
+          assertSameAccount(updatedAccount)
 
           const accountWithAuth = {
             ...updatedAccount,
@@ -420,12 +425,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       providerId,
     }
 
-    setAuthState({
+    setAuthState(prev => ({
       token,
       currentAccount: accountWithAuth,
-      accounts: [...authState.accounts, accountWithAuth],
+      accounts: prev.accounts.some((acc) => acc.address === account.address)
+        ? prev.accounts.map((acc) => (acc.address === account.address ? accountWithAuth : acc))
+        : [...prev.accounts, accountWithAuth],
       isAuthenticated: true,
-    })
+    }))
   }
 
   // 获取指定提供商的账户
