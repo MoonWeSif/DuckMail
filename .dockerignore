@@ -1,6 +1,16 @@
 node_modules
 .next
 .git
+.github
 .gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+netlify.toml
 *.md
-.env*.local
+img
+.env*
+.vercel
+.claude
+.ace-tool
+*.tsbuildinfo
