@@ -9,7 +9,19 @@ export interface Domain {
   updatedAt?: string
 }
 
+export interface HostingStatus {
+ status:string; protocol:string; paused:boolean; lastSuccessAt:string|null; errorCode?:string; errorMessage?:string; initialSyncComplete:boolean; truncated:boolean; stale:boolean; coverageFrom:string; folders:string[]
+}
 export interface Account {
+ lastAccessedAt?: number
+ source?: "smtp" | "microsoft"
+ loginMethod?: "password" | "apiKey"
+ hosting?: HostingStatus
+ capabilities?: {readMessages:boolean;markSeenLocally:boolean;hideMessagesLocally:boolean;deleteAccount:boolean;manageConnection:boolean}
+ status?: string
+ label?: string
+ tags?: string[]
+
   id: string
   address: string
   quota: number

@@ -6,7 +6,7 @@ import { Card, CardBody } from "@heroui/card"
 import { Spinner } from "@heroui/spinner"
 import { Avatar } from "@heroui/avatar"
 import { ArrowLeft, Trash2, Download, CheckCircle, XCircle } from "lucide-react"
-import { getMessage, markMessageAsRead, deleteMessage as apiDeleteMessage } from "@/lib/api"
+import { downloadHostedFile, getMessage, markMessageAsRead, deleteMessage as apiDeleteMessage } from "@/lib/api"
 import type { Message, MessageDetail as MessageDetailType } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -36,7 +36,8 @@ function EmailContent({ html, text, isMobile }: { html?: string[]; text?: string
     if (!iframe) return
 
     const hasHtml = html && html.length > 0 && html.join("").trim()
-    const content = hasHtml ? html.join("") : `<pre style="white-space: pre-wrap; font-family: sans-serif; margin: 0;">${text || ""}</pre>`
+    const safeText=(text||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]!))
+    const content = hasHtml ? html.join("") : `<pre style="white-space: pre-wrap; font-family: sans-serif; margin: 0;">${safeText}</pre>`
     const isDarkMode = document.documentElement.classList.contains("dark")
 
     const wrappedContent = `
@@ -44,6 +45,7 @@ function EmailContent({ html, text, isMobile }: { html?: string[]; text?: string
       <html>
       <head>
         <meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:;">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
           body {
@@ -149,7 +151,7 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
         setMessageDetail(detail)
         setError(null)
 
-        if (!message.seen) {
+        if (!message.seen && currentAccount?.capabilities?.markSeenLocally !== false) {
           // 标记已读失败不应影响详情展示
           markMessageAsRead(token, message.id, providerId).catch((err) => {
             console.warn("Failed to mark message as read:", err)
@@ -158,7 +160,7 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
       } catch (err) {
         if (cancelled) return
         console.error("Failed to fetch message detail:", err)
-        setError(t("fetchError"))
+        setError(currentAccount?.source === "microsoft" && err instanceof Error ? err.message : t("fetchError"))
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -240,9 +242,10 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
             color="danger"
             startContent={<Trash2 size={18} />}
             onPress={handleDelete}
+            isDisabled={currentAccount?.capabilities?.hideMessagesLocally === false}
             size={isMobile ? "sm" : "md"}
           >
-            {isMobile ? t("deleteMobile") : t("delete")}
+            {currentAccount?.source === "microsoft" ? "从 DuckMail 隐藏" : isMobile ? t("deleteMobile") : t("delete")}
           </Button>
           {messageDetail.downloadUrl && (
             <Button
@@ -250,7 +253,8 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
               color="primary"
               startContent={<Download size={18} />}
               as="a"
-              href={messageDetail.downloadUrl}
+              href={currentAccount?.source === "microsoft" ? undefined : messageDetail.downloadUrl}
+              onPress={currentAccount?.source === "microsoft" ? ()=>{if(token)downloadHostedFile(token,messageDetail.downloadUrl,messageDetail.id+".eml").catch(e=>setError(e.message))} : undefined}
               target="_blank"
               rel="noopener noreferrer"
               size={isMobile ? "sm" : "md"}
@@ -352,7 +356,8 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
                           variant="light"
                           isIconOnly
                           as="a"
-                          href={attachment.downloadUrl}
+                          href={currentAccount?.source === "microsoft" ? undefined : attachment.downloadUrl}
+                          onPress={currentAccount?.source === "microsoft" ? ()=>{if(token)downloadHostedFile(token,attachment.downloadUrl,attachment.filename).catch(e=>setError(e.message))} : undefined}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Download ${attachment.filename}`}

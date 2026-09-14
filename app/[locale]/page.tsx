@@ -1,17 +1,20 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
+import { useState, useEffect, useRef, useTransition } from "react"
 import Header from "@/components/header"
-import Sidebar from "@/components/sidebar"
+import Sidebar, { type SidebarNavItem } from "@/components/sidebar"
+import { SettingsPanel } from "@/components/settings-panel"
 import EmptyState from "@/components/empty-state"
-import FeatureCards from "@/components/feature-cards"
+import CreatingState from "@/components/creating-state"
+import InboxIntro from "@/components/inbox-intro"
 import AccountModal from "@/components/account-modal"
 import LoginModal from "@/components/login-modal"
-import AccountInfoBanner from "@/components/account-info-banner"
 import UpdateNoticeModal from "@/components/update-notice-modal"
+import HostedMessageList from "@/components/hosted-message-list"
 import MessageList from "@/components/message-list"
 import MessageDetail from "@/components/message-detail"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
+import { useApiProvider } from "@/contexts/api-provider-context"
 import { MailStatusProvider } from "@/contexts/mail-status-context"
 import type { Message } from "@/types"
 import { useHeroUIToast } from "@/hooks/use-heroui-toast"
@@ -46,15 +49,20 @@ function MainContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [loginAccountAddress, setLoginAccountAddress] = useState<string>("")
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
-  const { isAuthenticated, currentAccount, accounts, register } = useAuth()
+  const { isAuthenticated, currentAccount, accounts, register, isReady: authReady } = useAuth()
+  const { apiKey, isReady: providerReady } = useApiProvider()
+  // First-run: nothing to list yet, so the sidebar stays out of the way while
+  // a mailbox is being provisioned automatically.
+  const hasMailboxes = accounts.length > 0 || !!apiKey
+  useEffect(()=>{setSelectedMessage(null)},[currentAccount?.id])
   const [refreshKey, setRefreshKey] = useState(0)
   const { toast } = useHeroUIToast()
   const isMobile = useIsMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isCreatingAccount, setIsCreatingAccount] = useState(false)
-  const [showAccountBanner, setShowAccountBanner] = useState(false)
-  const [createdAccountInfo, setCreatedAccountInfo] = useState<{ email: string; password: string } | null>(null)
+  const autoCreateTriedRef = useRef(false)
   const [isUpdateNoticeModalOpen, setIsUpdateNoticeModalOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const t = useTranslations("mainPage")
   const locale = useLocale()
@@ -75,7 +83,7 @@ function MainContent() {
     }
   }, [])
 
-  // 一键创建临时邮箱（用户手动触发）
+  // 一键创建临时邮箱（首次进入自动触发，或用户手动触发）
   const handleQuickCreate = async () => {
     if (isCreatingAccount) return
     setIsCreatingAccount(true)
@@ -92,16 +100,16 @@ function MainContent() {
         // 一键创建的临时邮箱默认不过期
         await register(email, password, 0)
 
+        // 账号/密码可随时在右上角头像菜单查看，这里只做一次轻量提示
         toast({
-          title: t("tempMailCreated"),
-          description: t("checkBanner"),
+          title: t("mailboxReady"),
+          description: t("mailboxReadyDesc"),
           color: "success",
           variant: "flat",
+          timeout: 8000,
           icon: <CheckCircle size={16} />
         })
 
-        setCreatedAccountInfo({ email, password })
-        setShowAccountBanner(true)
         setIsCreatingAccount(false)
         return
       } catch (error: any) {
@@ -132,6 +140,17 @@ function MainContent() {
 
     setIsCreatingAccount(false)
   }
+
+  // 首次进入（本地没有任何邮箱、也没配置 API Key）时自动创建一个临时邮箱，
+  // 用户无需点击即可直接停留在主界面等待收件。仅在本次会话尝试一次。
+  useEffect(() => {
+    if (!authReady || !providerReady || autoCreateTriedRef.current) return
+    autoCreateTriedRef.current = true
+    if (accounts.length === 0 && !apiKey) {
+      void handleQuickCreate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, providerReady])
 
   const [isPending, startTransition] = useTransition()
 
@@ -184,22 +203,19 @@ function MainContent() {
     })
   }
 
-  const handleSidebarItemClick = (item: string) => {
-    console.log("Sidebar item clicked:", item)
+  const handleRefresh = () => {
+    toast({
+      title: t("refreshing"),
+      color: "primary",
+      variant: "flat",
+      icon: <RefreshCw size={16} />
+    })
+    setRefreshKey(prev => prev + 1)
+  }
 
+  const handleSidebarItemClick = (item: SidebarNavItem) => {
     if (item === "inbox") {
       setSelectedMessage(null)
-      return
-    }
-
-    if (item === "refresh") {
-      toast({
-        title: t("refreshing"),
-        color: "primary",
-        variant: "flat",
-        icon: <RefreshCw size={16} />
-      })
-      setRefreshKey(prev => prev + 1)
       return
     }
 
@@ -237,28 +253,39 @@ function MainContent() {
     })
   }
 
+  const sidebarProps = {
+    onItemClick: handleSidebarItemClick,
+    onQuickCreate: handleQuickCreate,
+    onCreateAccount: handleCreateAccount,
+    onLogin: handleLogin,
+    onOpenSettings: () => setIsSettingsOpen(true),
+    isCreating: isCreatingAccount,
+  }
+
   return (
     <>
       <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
         {/* 桌面端侧边栏 */}
-        {!isMobile && (
-          <Sidebar activeItem="inbox" onItemClick={handleSidebarItemClick} />
-        )}
+        {!isMobile && hasMailboxes && <Sidebar {...sidebarProps} />}
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {/* 移动端顶部栏包含菜单按钮 */}
           {isMobile && (
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-              <Button
-                isIconOnly
-                variant="light"
-                size="sm"
-                onPress={() => setIsSidebarOpen(true)}
-                className="text-gray-600 dark:text-gray-300"
-                aria-label={t("openMenu")}
-              >
-                <Menu size={20} />
-              </Button>
+              {hasMailboxes ? (
+                <Button
+                  isIconOnly
+                  variant="light"
+                  size="sm"
+                  onPress={() => setIsSidebarOpen(true)}
+                  className="text-gray-600 dark:text-gray-300"
+                  aria-label={t("openMenu")}
+                >
+                  <Menu size={20} />
+                </Button>
+              ) : (
+                <div className="w-8" />
+              )}
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
                   <img
@@ -275,90 +302,76 @@ function MainContent() {
 
           <Header
             onCreateAccount={handleCreateAccount}
+            onQuickCreate={handleQuickCreate}
             onLocaleChange={handleLocaleChange}
             onLogin={handleLogin}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onRefresh={handleRefresh}
             isMobile={isMobile}
           />
-          {/* 账户信息横幅 */}
-          {showAccountBanner && createdAccountInfo && (
-            <AccountInfoBanner
-              email={createdAccountInfo.email}
-              password={createdAccountInfo.password}
-              onClose={() => {
-                setShowAccountBanner(false)
-                setCreatedAccountInfo(null)
-              }}
-            />
-          )}
           <main className="flex-1 overflow-y-auto">
-            <div className="h-full flex flex-col">
-              <div className="flex-1">
-                {isAuthenticated && currentAccount ? (
-                  selectedMessage ? (
-                    <MessageDetail
-                      message={selectedMessage}
-                      onBack={handleBackToList}
-                      onDelete={handleDeleteMessageInDetail}
-                    />
-                  ) : (
-                    <MessageList onSelectMessage={handleSelectMessage} refreshKey={refreshKey} />
-                  )
-                ) : (
-                  <EmptyState onCreateAccount={handleQuickCreate} isAuthenticated={isAuthenticated} isCreating={isCreatingAccount} />
-                )}
+            {isAuthenticated && currentAccount ? (
+              selectedMessage ? (
+                <MessageDetail key={currentAccount.id + selectedMessage.id}
+                  message={selectedMessage}
+                  onBack={handleBackToList}
+                  onDelete={handleDeleteMessageInDetail}
+                />
+              ) : (
+                currentAccount.source === "microsoft" ? <HostedMessageList key={currentAccount.id} onSelectMessage={handleSelectMessage} refreshKey={refreshKey} /> : <MessageList onSelectMessage={handleSelectMessage} refreshKey={refreshKey} />
+              )
+            ) : !authReady || !providerReady || isCreatingAccount ? (
+              // 本地状态尚未恢复 / 正在自动创建：用同一个轻量动画占位，避免落地页闪烁
+              <CreatingState />
+            ) : (
+              // 自动创建失败或用户删光了邮箱：保留手动入口，并继续展示系统说明
+              <div className="flex flex-col">
+                <EmptyState onCreateAccount={handleQuickCreate} isAuthenticated={isAuthenticated} isCreating={isCreatingAccount} />
+                <InboxIntro />
               </div>
-              {/* 未登录落地页：功能卡片 + 广告（有内容支撑，符合 AdSense 要求） */}
-              {(!isAuthenticated || !currentAccount) && (
-                <FeatureCards />
-              )}
-            </div>
+            )}
           </main>
         </div>
 
         {/* 移动端侧边栏抽屉 */}
-        {isMobile && isSidebarOpen && (
-          <div className="fixed inset-0 z-50">
+        {isMobile && hasMailboxes && (
+          <div hidden={!isSidebarOpen} className="fixed inset-0 z-50">
             <div
-              className="absolute inset-0 bg-black bg-opacity-50 transition-opacity duration-300"
+              className="absolute inset-0 bg-black/50 transition-opacity duration-300"
               onClick={() => setIsSidebarOpen(false)}
             />
-            <div className={`absolute left-0 top-0 h-full w-64 bg-white dark:bg-gray-900 shadow-lg transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-              <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
-                      <img
-                        src={DUCKMAIL_LOGO_PATH}
-                        alt="DuckMail Logo"
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <span className="font-semibold text-lg text-gray-800 dark:text-white">duckmail.sbs</span>
-                  </div>
-                  <Button
-                    isIconOnly
-                    variant="light"
-                    size="sm"
-                    onPress={() => setIsSidebarOpen(false)}
-                    className="text-gray-600 dark:text-gray-300"
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
+            <div className={`absolute left-0 top-0 h-full shadow-lg transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
               <Sidebar
-                activeItem="inbox"
+                {...sidebarProps}
+                isMobile
+                onClose={() => setIsSidebarOpen(false)}
                 onItemClick={(item) => {
                   handleSidebarItemClick(item)
                   setIsSidebarOpen(false)
                 }}
-                isMobile={true}
+                onQuickCreate={() => {
+                  setIsSidebarOpen(false)
+                  handleQuickCreate()
+                }}
+                onCreateAccount={() => {
+                  setIsSidebarOpen(false)
+                  handleCreateAccount()
+                }}
+                onLogin={() => {
+                  setIsSidebarOpen(false)
+                  handleLogin()
+                }}
+                onOpenSettings={() => {
+                  setIsSidebarOpen(false)
+                  setIsSettingsOpen(true)
+                }}
               />
             </div>
           </div>
         )}
       </div>
 
+      <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <AccountModal isOpen={isAccountModalOpen} onClose={handleCloseModal} />
       <LoginModal
         isOpen={isLoginModalOpen}

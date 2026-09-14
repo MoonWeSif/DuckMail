@@ -102,7 +102,6 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   }
 
   const handleSaveApiKey = () => {
-    console.log(`🔑 [Settings] Saving API Key: ${apiKeyInput ? `${apiKeyInput.substring(0, 10)}...` : 'null'}`)
 
     if (apiKeyInput && !apiKeyInput.startsWith('dk_') && !apiKeyInput.startsWith('Bearer ')) {
       toast({ title: t("apiKeyFormatWarning"), color: "warning", variant: "flat" })
@@ -114,13 +113,13 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   const handleTestApiKey = async () => {
     const currentApiKey = localStorage.getItem("api-key")
-    console.log(`🔑 [Settings] Current stored API Key: ${currentApiKey ? `${currentApiKey.substring(0, 10)}...` : 'null'}`)
 
     if (currentApiKey) {
       try {
         const { fetchDomainsFromProvider } = await import("@/lib/api")
-        console.log(`🔑 [Settings] Testing API Key with domains request...`)
         await fetchDomainsFromProvider("duckmail")
+        const { listHostedAccounts } = await import("@/lib/hosting-api")
+        await listHostedAccounts()
         toast({ title: t("testComplete"), color: "success", variant: "flat" })
       } catch (error) {
         console.error(`🔑 [Settings] API Key test failed:`, error)

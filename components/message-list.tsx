@@ -15,6 +15,7 @@ import { formatDistanceToNow } from "date-fns"
 import { enUS, zhCN } from "date-fns/locale"
 import { Mail } from "lucide-react"
 import { useTranslations, useLocale } from "next-intl"
+import InboxIntro from "@/components/inbox-intro"
 
 interface MessageListProps {
   onSelectMessage: (message: Message) => void
@@ -174,17 +175,22 @@ export default function MessageList({ onSelectMessage, refreshKey }: MessageList
 
   if (messages.length === 0) {
     return (
-      <div className="h-full overflow-y-auto p-4">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{t("inbox")}</h2>
-        </div>
-        <div className="flex flex-col justify-center items-center h-64 text-center">
-          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-10 h-10 text-gray-400" />
+      <div className="h-full overflow-y-auto">
+        <div className={isMobile ? "p-2" : "p-4"}>
+          <div className={isMobile ? "mb-4" : "mb-6"}>
+            <h2 className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-gray-800 dark:text-gray-100`}>{t("inbox")}</h2>
           </div>
-          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">{t("emptyTitle")}</h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-md">{t("emptyDesc")}</p>
+          <div className="flex flex-col items-center py-16 text-center">
+            <Mail className="mb-4 h-8 w-8 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+            <h3 className="text-medium font-medium text-gray-800 dark:text-gray-100">{t("emptyTitle")}</h3>
+            <p className="mt-1.5 flex items-center gap-1.5 text-small text-gray-500 dark:text-gray-400">
+              <span className={`h-1.5 w-1.5 rounded-full ${isEnabled ? "bg-green-500" : "bg-gray-400"}`} />
+              {isEnabled ? t("autoChecking") : t("autoCheckPaused")}
+            </p>
+          </div>
         </div>
+        {/* 收件箱为空时用简短的系统说明填充右侧空白，可向下滚动浏览 */}
+        <InboxIntro />
       </div>
     )
   }

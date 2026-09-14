@@ -46,32 +46,107 @@
     "loginExisting": "登录现有账户",
     "accountSwitchFailed": "切换账户失败",
     "accountSwitchFailedDesc": "请尝试重新登录该账户",
-    "passwordCopied": "密码已复制"
+    "passwordCopied": "密码已复制",
+    "refresh": "刷新收件箱",
+    "tempMailbox": "临时邮箱",
+    "hostedMailbox": "Microsoft 托管",
+    "accessPassword": "访问密码",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "copyPassword": "复制密码",
+    "copyAddress": "复制邮箱地址",
+    "label": "备注",
+    "lastSync": "最近同步 {time}",
+    "notSynced": "尚未完成首次同步",
+    "syncPaused": "同步已暂停",
+    "needsReauth": "Microsoft 授权需要更新",
+    "openPanel": "打开管理面板",
+    "removeFromDevice": "从本机移除",
+    "removeFromDeviceDesc": "仅移除本地记录，稍后可重新登录",
+    "deleteForever": "永久删除此邮箱",
+    "deleteForeverDesc": "从服务器删除，无法恢复",
+    "notSignedIn": "尚未登录邮箱",
+    "notSignedInDesc": "创建临时邮箱，或登录已有邮箱",
+    "quickCreate": "一键创建临时邮箱",
+    "customCreate": "自定义创建邮箱"
   },
   "sidebar": {
-    "inbox": "收件箱",
-    "refresh": "刷新",
+    "navigation": "邮箱导航",
+    "closeMenu": "关闭菜单",
+    "searchPlaceholder": "搜索邮箱、备注或标签",
+    "scopeAll": "全部",
+    "scopeTemp": "临时",
+    "scopeHosted": "托管",
+    "tempMailboxes": "临时邮箱",
+    "hostedMailboxes": "托管邮箱",
+    "addMailbox": "添加邮箱",
+    "quickCreate": "一键创建临时邮箱",
+    "quickCreateDesc": "随机地址，立即可用",
+    "customCreate": "自定义创建",
+    "customCreateDesc": "自选用户名、域名和有效期",
+    "loginExisting": "登录已有邮箱",
+    "loginExistingDesc": "临时邮箱或托管邮箱",
+    "filter": "筛选托管邮箱",
+    "filterAll": "全部状态",
+    "filterDomain": "按域名筛选",
+    "filterAllDomains": "全部域名",
+    "filterNeedsReauth": "需更新授权",
+    "filterPaused": "已暂停",
+    "reload": "重新加载托管邮箱",
+    "statusDisabled": "已禁用",
+    "statusNeedsReauth": "需更新授权",
+    "statusPaused": "已暂停",
+    "loadFailed": "加载托管邮箱失败",
+    "retry": "重试",
+    "noMatch": "没有匹配的邮箱",
+    "noTemp": "还没有临时邮箱",
+    "noHosted": "没有托管邮箱",
+    "apiKeyHint": "设置 API Key 后，可在此加载并切换你名下的全部托管邮箱。",
+    "setApiKey": "设置 API Key",
+    "switchFailed": "切换邮箱失败",
+    "mailboxCount": "{count} 个邮箱",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
     "updates": "更新通知",
     "api": "API 文档",
     "faq": "常见问题",
-    "privacy": "隐私政策"
+    "privacy": "隐私政策",
+    "github": "GitHub"
   },
   "emptyState": {
     "title": "临时邮件",
-    "description": "使用我们的免费临时一次性匿名邮件服务，保护您的个人邮箱地址免受垃圾邮件、机器人、钓鱼和其他在线滥用的侵害。",
     "noRisk": "无需承诺，无风险——只需安全、即时地访问临时邮箱地址。",
-    "poweredBy": "DuckMail 使用自建后端服务，为您提供稳定可靠的临时邮件服务，Mail.tm 作为备选提供商。",
     "useNow": "一键创建临时邮箱",
-    "creating": "正在创建..."
+    "creating": "正在创建...",
+    "creatingTitle": "正在为你准备临时邮箱",
+    "creatingDesc": "无需注册，几秒后即可开始收件。"
   },
-  "featureCards": {
-    "secureTitle": "安全的临时邮箱",
-    "secureDesc": "您的临时邮箱地址受到可靠密码保护，在浏览器中随机生成，为您提供防止未经授权访问和潜在泄露的屏障。",
-    "instantTitle": "即时一次性邮箱",
-    "instantDesc": "不再浪费宝贵时间进行注册、填表或解决验证码。您的临时邮箱地址可立即使用，让您轻松掌控一切。",
-    "fastTitle": "快速匿名邮件服务",
-    "fastDesc": "体验快速的消息传递，无延迟或限制。我们的服务经过精心调优，确保最大传递速度，让您保持无缝连接。",
-    "poweredBy": "DuckMail 使用自建后端 API 服务，Mail.tm 作为部分用户的备选提供商。"
+  "inboxIntro": {
+    "intro": "DuckMail 是一个免费的临时邮箱服务。打开页面即自动获得一个可收信的地址，用它去注册网站、接收验证码，真实邮箱不会暴露，也不会收到后续的营销邮件。",
+    "features": {
+      "noSignup": {
+        "title": "无需注册",
+        "desc": "不填表、不验证、不留个人信息，打开即用。"
+      },
+      "localPassword": {
+        "title": "密码只在你手里",
+        "desc": "随机密码在浏览器中生成并保存在本地，我们无法查看，也无法找回。"
+      },
+      "instant": {
+        "title": "自动收件",
+        "desc": "新邮件到达后会自动出现在收件箱，不需要手动刷新。"
+      },
+      "api": {
+        "title": "开放 API",
+        "desc": "提供与 Mail.tm 兼容的接口，方便脚本和自动化测试直接调用。"
+      }
+    },
+    "community": {
+      "title": "设置里的 API Key 和域名面板是什么？",
+      "p1": "这两项只和 LinuxDo 社区成员有关。如果你只是来收邮件，直接忽略即可：所有内置的临时域名都免费开放，不需要注册或登录；API 同样可以直接调用，不需要任何鉴权。",
+      "p2": "API Key 面向 LinuxDo 社区成员免费发放。用 LinuxDo 账号登录后，可以接入自己的域名（需 LinuxDo 2 级及以上），并管理托管的 Microsoft 邮箱。除了这两项，它不带来任何额外权限——临时邮箱本身的功能，对所有人都是一样的。"
+    },
+    "poweredBy": "DuckMail 使用自建后端服务，Mail.tm 作为备选提供商。邮件内容仅短期保存，请及时处理重要信息。"
   },
   "messageList": {
     "inbox": "收件箱",
@@ -83,6 +158,8 @@
     "new": "新",
     "pollingActive": "🔄 正在轮询新邮件（2秒间隔）",
     "pollingPaused": "⏸ 轮询已暂停",
+    "autoChecking": "正在自动检查新邮件，收到后会即时显示",
+    "autoCheckPaused": "自动检查已暂停，可点击顶部刷新手动获取",
     "messageCount": "邮件数",
     "fetchError": "获取邮件失败，请稍后再试",
     "refreshError": "刷新邮件失败，请稍后再试"
@@ -145,11 +222,6 @@
     "fillEmailAndPassword": "请填写邮箱地址和密码",
     "loginFailed": "登录失败，请检查邮箱地址和密码"
   },
-  "accountBanner": {
-    "created": "临时邮箱已创建",
-    "password": "密码",
-    "saveWarning": "请妥善保存，密码无法找回"
-  },
   "settings": {
     "title": "API 提供商设置",
     "providerManagement": "API 提供商管理",
@@ -167,7 +239,7 @@
     "apiKeySettings": "API Key 设置",
     "apiKeyLabel": "API Key (可选)",
     "apiKeyPlaceholder": "输入您的 API Key",
-    "apiKeyDescription": "提供 API Key 可获得更多域名选择和私有域名创建权限。当前Context中的API Key: {apiKey}",
+    "apiKeyDescription": "同一个 API Key 可使用自己的全部私有域名和托管邮箱，保存在当前浏览器。当前 Key：{apiKey}",
     "apiKeyNotSet": "未设置",
     "apiKeyFormatWarning": "API Key 格式可能不正确，应以 'dk_' 开头",
     "apiKeySaved": "API Key 已保存",
@@ -226,8 +298,8 @@
     "confirm": "确认切换"
   },
   "mainPage": {
-    "tempMailCreated": "已为你创建临时邮箱",
-    "checkBanner": "点击右上角头像可查看密码，密码无法找回请妥善保管",
+    "mailboxReady": "临时邮箱已就绪，随时可以收件",
+    "mailboxReadyDesc": "点击右上角头像可查看地址与密码。密码不可找回，请妥善保管。",
     "createFailed": "自动创建临时邮箱失败",
     "createFailedDesc": "请稍后重试，或者手动创建一个邮箱账号。",
     "switchedToZh": "已切换到中文",
@@ -296,7 +368,7 @@
     "auth": "认证",
     "authDescription": "大部分端点需要通过 Bearer Token 进行认证。您可以通过提供地址和密码来获取 Token。",
     "apiKey": "API 密钥 (可选)",
-    "apiKeyDescription_pre": "部分接口 (获取域名、创建账户) 支持可选的 API 密钥，用于获取私有域名或在私有域名下创建邮箱。密钥以 `dk_` 开头。您可以访问 ",
+    "apiKeyDescription_pre": "同一个 API 密钥可获取本人全部私有域名、创建域名邮箱，以及访问和管理全部托管邮箱。密钥以 `dk_` 开头。您可以访问 ",
     "apiKeyDescription_link": "https://domain.duckmail.sbs",
     "apiKeyDescription_post": " 获取您的 API 密钥。",
     "endpoints": "API 端点",

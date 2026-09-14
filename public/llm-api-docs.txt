@@ -229,3 +229,30 @@ curl -X PATCH https://api.duckmail.sbs/messages/<message_id> \
 # 6. Get domains (with API key for private domains)
 curl https://api.duckmail.sbs/domains \
   -H "Authorization: Bearer dk_your_api_key"
+
+
+## Microsoft Hosted Accounts
+
+Hosted mailboxes use the same POST /token {address,password} and account Bearer token message APIs. password is an independent DuckMail access password, NOT the actual Microsoft password.
+
+POST /accounts with source="microsoft" and connection={protocol:"auto"|"graph"|"imap",refreshToken,clientId} imports one account; POST /accounts/imports {entries:[...]} imports up to 500. Both require an owner session or API Key and return HTTP 202 {importId,statusUrl}. Poll GET /accounts/imports/{importId}. SMTP account creation remains HTTP 201.
+
+Management endpoints (owner or their API Key):
+GET /accounts?page=1&q=&status= — hosted accounts only, Hydra pagination.
+GET /accounts/{id}/connection — connection status/clientId, never refreshToken.
+PATCH /accounts/{id} {label?,tags?,paused?,status?:"active"|"disabled"}.
+POST /accounts/{id}/password {password} — resets DuckMail password and invalidates old account tokens.
+POST /accounts/{id}/connection {protocol,clientId,refreshToken} — verifies replacement authorization asynchronously; does not change password or account ID.
+POST /accounts/{id}/token — exchanges the owner's API Key for a token for this mailbox.
+POST /accounts/{id}/sync — schedules bounded/coalesced sync, HTTP 202.
+DELETE /accounts/{id} — owner-only removal of hosted account, credentials and cache; never deletes Microsoft mail.
+POST /accounts/imports/{importId}/retry or /cancel — recover transient failures or cancel pending rows.
+
+POST /token stays {address,password} -> {id,token}, without Microsoft credentials or API Key. Hosted account token lifetime is 24h. GET /me adds source, hosting, capabilities.
+GET /messages supports folder=inbox|junk|all, from, subject, receivedAfter (RFC3339), seen=true|false; defaults to inbox, 30 items/page, recent 7 days. Hydra count is local synchronized count, not the remote mailbox total. Check sync.initialSyncComplete, stale, truncated, and lastSuccessAt before interpreting an empty list.
+GET /messages/{id}/source downloads MIME; GET /messages/{id}/attachments/{attachmentId} downloads attachments. Both require account Bearer token. Maximum source size is 25 MiB.
+PATCH /messages/{id} and DELETE /messages/{id} affect only local seen/hidden state. A read-only Key cannot perform either operation.
+
+One API Key accesses all private domains and hosted mailboxes owned by its user, including local seen/hide and management. No per-key permissions or mailbox selection. Existing domain Keys work directly. Revoking a Key invalidates its derived account tokens, not independent password sessions.
+
+Microsoft upstream authorization failure uses code UPSTREAM_REAUTH_REQUIRED (HTTP 424), not DuckMail 401. Refresh tokens are encrypted server-side, never returned. Same address has one DuckMail account; duplicate imports do not overwrite passwords. Graph import requires identity verification and Mail.Read permission; IMAP requires OAuth and enabled IMAP access. Imported confidential-client credentials requiring a secret are unsupported. No send-mail or remote delete is performed.

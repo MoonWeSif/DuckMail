@@ -46,32 +46,107 @@
     "loginExisting": "Login Existing Account",
     "accountSwitchFailed": "Account Switch Failed",
     "accountSwitchFailedDesc": "Please try logging in to this account again",
-    "passwordCopied": "Password copied"
+    "passwordCopied": "Password copied",
+    "refresh": "Refresh inbox",
+    "tempMailbox": "Temp mailbox",
+    "hostedMailbox": "Microsoft hosted",
+    "accessPassword": "Access password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "copyPassword": "Copy password",
+    "copyAddress": "Copy email address",
+    "label": "Label",
+    "lastSync": "Last synced {time}",
+    "notSynced": "Initial sync not finished",
+    "syncPaused": "Sync paused",
+    "needsReauth": "Microsoft authorization required",
+    "openPanel": "Open management panel",
+    "removeFromDevice": "Remove from this device",
+    "removeFromDeviceDesc": "Only clears the local record; you can sign in again later",
+    "deleteForever": "Delete this mailbox permanently",
+    "deleteForeverDesc": "Deleted on the server and cannot be recovered",
+    "notSignedIn": "No mailbox signed in",
+    "notSignedInDesc": "Create a temp mailbox or sign in to an existing one",
+    "quickCreate": "Create temp mailbox",
+    "customCreate": "Custom create mailbox"
   },
   "sidebar": {
-    "inbox": "Inbox",
-    "refresh": "Refresh",
+    "navigation": "Mailbox navigation",
+    "closeMenu": "Close menu",
+    "searchPlaceholder": "Search mailboxes or notes",
+    "scopeAll": "All",
+    "scopeTemp": "Temp",
+    "scopeHosted": "Hosted",
+    "tempMailboxes": "Temp Mailboxes",
+    "hostedMailboxes": "Hosted Mailboxes",
+    "addMailbox": "Add mailbox",
+    "quickCreate": "Create temp mailbox",
+    "quickCreateDesc": "Random address, ready instantly",
+    "customCreate": "Custom create",
+    "customCreateDesc": "Pick username, domain and lifetime",
+    "loginExisting": "Sign in to existing mailbox",
+    "loginExistingDesc": "Temp or hosted mailbox",
+    "filter": "Filter hosted mailboxes",
+    "filterAll": "All statuses",
+    "filterDomain": "Filter by domain",
+    "filterAllDomains": "All domains",
+    "filterNeedsReauth": "Authorization required",
+    "filterPaused": "Paused",
+    "reload": "Reload hosted mailboxes",
+    "statusDisabled": "Disabled",
+    "statusNeedsReauth": "Authorization required",
+    "statusPaused": "Paused",
+    "loadFailed": "Failed to load hosted mailboxes",
+    "retry": "Retry",
+    "noMatch": "No matching mailboxes",
+    "noTemp": "No temp mailboxes yet",
+    "noHosted": "No hosted mailboxes",
+    "apiKeyHint": "Add your API Key to load and switch between all hosted mailboxes you own.",
+    "setApiKey": "Set API Key",
+    "switchFailed": "Failed to switch mailbox",
+    "mailboxCount": "{count} mailboxes",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
     "updates": "Updates",
-    "api": "API",
+    "api": "API Docs",
     "faq": "FAQ",
-    "privacy": "Privacy"
+    "privacy": "Privacy",
+    "github": "GitHub"
   },
   "emptyState": {
     "title": "Temp Mail",
-    "description": "Protect your personal email address from spam, bots, phishing, and other online abuse with our free temporary disposable anonymous email service.",
     "noRisk": "No commitments, no risks—just secure, instant access to a temp email address.",
-    "poweredBy": "DuckMail runs its own backend service to deliver stable and reliable temporary email. Mail.tm is available as an optional fallback provider.",
     "useNow": "Create Temporary Inbox",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "creatingTitle": "Setting up your temporary inbox",
+    "creatingDesc": "No sign-up needed. You'll be able to receive mail in a few seconds."
   },
-  "featureCards": {
-    "secureTitle": "Secure Temporary Email",
-    "secureDesc": "Your temporary email address is protected by a reliable password, generated randomly in your browser, providing a barrier against unauthorized access and potential breaches.",
-    "instantTitle": "Instant Disposable Email",
-    "instantDesc": "No more wasting precious time on registrations, form-filling, or solving captchas. Your temp email address is ready for use instantly, putting you in control effortlessly.",
-    "fastTitle": "Fast and Anonymous Email Service",
-    "fastDesc": "Experience fast message delivery without delays or restrictions. Our service is finely tuned for maximum delivery speed, ensuring you stay connected seamlessly.",
-    "poweredBy": "DuckMail uses its own self-hosted backend API. Mail.tm is available as an optional provider for some users."
+  "inboxIntro": {
+    "intro": "DuckMail is a free temporary email service. Opening the page gives you a working address right away — use it to sign up for sites and receive verification codes without exposing your real inbox or inviting follow-up marketing.",
+    "features": {
+      "noSignup": {
+        "title": "No sign-up",
+        "desc": "No forms, no verification, no personal details. Open the page and it works."
+      },
+      "localPassword": {
+        "title": "Your password stays with you",
+        "desc": "A random password is generated in your browser and stored locally. We can't see it or recover it."
+      },
+      "instant": {
+        "title": "Mail arrives on its own",
+        "desc": "New messages show up in the inbox automatically — no manual refresh."
+      },
+      "api": {
+        "title": "Open API",
+        "desc": "A Mail.tm-compatible API for scripts and automated testing."
+      }
+    },
+    "community": {
+      "title": "What are the API Key and domain panel in Settings?",
+      "p1": "They only matter to members of the LinuxDo community. If you're just here to receive mail, ignore them: every built-in temporary domain is free and needs no account or sign-in, and the API can be called directly without any authentication.",
+      "p2": "API Keys are issued free of charge to LinuxDo members. Signing in with a LinuxDo account lets you connect your own domains (LinuxDo trust level 2 or above) and manage hosted Microsoft mailboxes. That is all it adds — the temporary mailbox itself works the same for everyone."
+    },
+    "poweredBy": "DuckMail runs its own backend, with Mail.tm as an optional fallback provider. Messages are kept only briefly — act on anything important promptly."
   },
   "messageList": {
     "inbox": "Inbox",
@@ -83,6 +158,8 @@
     "new": "New",
     "pollingActive": "🔄 Polling for new messages (1s interval)",
     "pollingPaused": "⏸ Polling paused",
+    "autoChecking": "Checking for new mail automatically — it will appear here instantly",
+    "autoCheckPaused": "Auto-check is paused. Use Refresh at the top to fetch manually",
     "messageCount": "Messages",
     "fetchError": "Failed to fetch emails. Please try again.",
     "refreshError": "Failed to refresh emails. Please try again."
@@ -145,11 +222,6 @@
     "fillEmailAndPassword": "Please fill in email address and password",
     "loginFailed": "Login failed, please check email address and password"
   },
-  "accountBanner": {
-    "created": "Email Created",
-    "password": "PWD",
-    "saveWarning": "Save it, password can't be recovered"
-  },
   "settings": {
     "title": "API Provider Settings",
     "providerManagement": "API Provider Management",
@@ -167,7 +239,7 @@
     "apiKeySettings": "API Key Settings",
     "apiKeyLabel": "API Key (Optional)",
     "apiKeyPlaceholder": "Enter your API Key",
-    "apiKeyDescription": "Providing an API Key gives you access to more domain choices and private domain creation permissions. Current Context API Key: {apiKey}",
+    "apiKeyDescription": "One API Key for all your private domains and hosted mailboxes, saved in this browser. Current key: {apiKey}",
     "apiKeyNotSet": "Not set",
     "apiKeyFormatWarning": "API Key format may be incorrect, should start with 'dk_'",
     "apiKeySaved": "API Key Saved",
@@ -226,8 +298,8 @@
     "confirm": "Confirm Switch"
   },
   "mainPage": {
-    "tempMailCreated": "Temporary email created",
-    "checkBanner": "Click avatar to view password. Password cannot be recovered, please save it",
+    "mailboxReady": "Your temporary inbox is ready",
+    "mailboxReadyDesc": "Open the avatar menu (top right) to view the address and password. The password cannot be recovered — keep it safe.",
     "createFailed": "Failed to create temporary email",
     "createFailedDesc": "Please try again later or create an account manually.",
     "switchedToZh": "已切换到中文",
@@ -296,7 +368,7 @@
     "auth": "Authentication",
     "authDescription": "Most endpoints require authentication via a Bearer Token. You can obtain a token by providing an address and password.",
     "apiKey": "API Key (Optional)",
-    "apiKeyDescription_pre": "Some endpoints (getting domains, creating accounts) support an optional API Key to get private domains or create accounts under them. The key starts with `dk_`. You can obtain your API Key from ",
+    "apiKeyDescription_pre": "One API Key accesses all your private domains and hosted mailboxes, including account creation and hosted mailbox management. The key starts with `dk_`. You can obtain your API Key from ",
     "apiKeyDescription_link": "https://domain.duckmail.sbs",
     "apiKeyDescription_post": ".",
     "endpoints": "API Endpoints",

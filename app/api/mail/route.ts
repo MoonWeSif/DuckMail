@@ -1,216 +1,105 @@
-import { type NextRequest, NextResponse } from "next/server"
-
-// 默认API提供商（向后兼容）
-const DEFAULT_API_BASE_URL = "https://api.duckmail.sbs"
-
-// 从请求头获取API提供商的基础URL
-function getApiBaseUrl(request: NextRequest): string {
-  const providerBaseUrl = request.headers.get("X-API-Provider-Base-URL")
-  return providerBaseUrl || DEFAULT_API_BASE_URL
-}
-
-async function handleRequest(
-  originalRequest: NextRequest,
-  endpoint: string,
-  options: RequestInit,
-) {
-  const apiBaseUrl = getApiBaseUrl(originalRequest)
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000) // 15秒超时
-
-  const requestHeaders = new Headers(options.headers)
-
-  // 针对所有请求，设置更通用的 Accept header，优先 ld+json
-  requestHeaders.set("Accept", "application/ld+json, application/json, */*")
-
-  if (options.method === "GET" || !options.method) {
-    // GET 请求通常不需要 Content-Type
-    requestHeaders.delete("Content-Type")
-  }
-
-  // 确保 User-Agent 存在
-  if (!requestHeaders.has("User-Agent")) {
-    requestHeaders.set("User-Agent", "DuckMail/1.0 (Vercel Function)")
-  }
-
-  const finalOptions: RequestInit = {
-    ...options,
-    headers: requestHeaders,
-    signal: controller.signal,
-  }
-
-  console.log(
-    `Proxying request to: ${apiBaseUrl}${endpoint}`,
-    `Method: ${finalOptions.method || "GET"}`,
-    `Headers: ${JSON.stringify(Object.fromEntries(requestHeaders.entries()))}`,
+import { NextRequest, NextResponse } from "next/server";
+const BASE =
+  process.env.API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://api.duckmail.sbs";
+async function handle(req: NextRequest) {
+  const endpoint = req.nextUrl.searchParams.get("endpoint") || "";
+  if (
+    !/^\/(accounts|token|me|messages|sources|domains|mercure)(\/|\?|$)/.test(
+      endpoint,
+    ) ||
+    endpoint.includes("\\")
   )
-  if (finalOptions.body) {
-    console.log(`Body: ${finalOptions.body}`)
-  }
-
-  try {
-    const response = await fetch(`${apiBaseUrl}${endpoint}`, finalOptions)
-    clearTimeout(timeoutId)
-
-    const responseContentType = response.headers.get("Content-Type") || "unknown"
-    console.log(
-      `Response from DuckMail API for ${endpoint}: Status ${response.status}, Content-Type: ${responseContentType}`,
-    )
-
-    if (!response.ok) {
-      const errorBody = await response.text()
-      console.error(
-        `API Error for ${endpoint}: ${response.status} ${response.statusText}`,
-        `Response body: ${errorBody}`,
-      )
-      return new Response(errorBody, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: { "Content-Type": responseContentType },
-      })
-    }
-
-    if (response.status === 204) {
-      // No Content
-      return new Response(null, { status: 204 })
-    }
-
-    // 尝试解析 JSON，即使 Content-Type 不是严格的 application/json
-    // mail.tm 使用 application/ld+json
-    if (responseContentType.includes("json") || responseContentType.includes("javascript")) {
+    return NextResponse.json({ message: "Invalid endpoint" }, { status: 400 });
+  const configured = new URL(BASE);
+  let base = BASE;
+  if (req.headers.get("X-DuckMail-Hosted") !== "true") {
+    const supplied = req.headers.get("X-API-Provider-Base-URL");
+    if (supplied) {
       try {
-        const data = await response.json()
-        return NextResponse.json(data)
-      } catch (jsonError: any) {
-        console.error(
-          `Error parsing JSON response from ${endpoint} (Content-Type: ${responseContentType}):`,
-          jsonError.message,
+        const target = new URL(supplied);
+        const allowed = [
+          configured.origin,
+          "https://api.duckmail.sbs",
+          "https://api.mail.tm",
+          ...(process.env.DUCKMAIL_ALLOWED_API_ORIGINS || "")
+            .split(",")
+            .filter(Boolean),
+        ];
+        if (
+          !allowed.includes(target.origin) ||
+          target.username ||
+          target.password
         )
-        // 如果 JSON 解析失败，尝试返回文本
-        const textDataFallback = await response.text() // Re-read as text if original read failed or was not text
-        console.error(`Response text fallback: ${textDataFallback.substring(0, 200)}`)
+          return NextResponse.json(
+            { message: "管理员尚未允许此 API 来源" },
+            { status: 400 },
+          );
+        // The browser's default DuckMail provider always uses the server-configured backend.
+        base =
+          target.origin === "https://api.duckmail.sbs" ||
+          target.origin === configured.origin
+            ? BASE
+            : target.origin;
+      } catch {
         return NextResponse.json(
-          {
-            error: "Failed to parse JSON response from upstream API",
-            details: jsonError.message,
-            upstream_status: response.status,
-            upstream_content_type: responseContentType,
-          },
-          { status: 502 }, // Bad Gateway
-        )
+          { message: "Invalid API origin" },
+          { status: 400 },
+        );
       }
-    } else {
-      const textData = await response.text()
-      console.warn(
-        `Received non-JSON response from ${endpoint}: ${responseContentType}. Body: ${textData.substring(0, 100)}...`,
-      )
-      return new Response(textData, {
-        status: response.status,
-        headers: { "Content-Type": responseContentType },
-      })
     }
-  } catch (error: any) {
-    clearTimeout(timeoutId)
-    if (error.name === "AbortError") {
-      console.error(`API request to ${endpoint} timed out:`, error.message)
+  }
+  const url = new URL(endpoint, base);
+  if (url.origin !== new URL(base).origin)
+    return NextResponse.json({ message: "Invalid endpoint" }, { status: 400 });
+  const headers = new Headers({
+    Accept: "application/ld+json, application/json, */*",
+  });
+  for (const h of ["Authorization", "Content-Type", "Idempotency-Key"]) {
+    const v = req.headers.get(h);
+    if (v) headers.set(h, v);
+  }
+  try {
+    const body = ["GET", "HEAD"].includes(req.method)
+      ? undefined
+      : await req.text();
+    if (body && Buffer.byteLength(body) > 5 * 1024 * 1024)
       return NextResponse.json(
-        {
-          error: `Failed to fetch from API: Request to ${endpoint} timed out`,
-          details: error.message,
-        },
-        { status: 504 }, // Gateway Timeout
-      )
+        { message: "Request too large" },
+        { status: 413 },
+      );
+    const res = await fetch(url, {
+      method: req.method,
+      headers,
+      body: body || undefined,
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(30000),
+    });
+    const out = new Headers({ "Cache-Control": "no-store" });
+    for (const h of [
+      "Content-Type",
+      "Content-Disposition",
+      "Retry-After",
+      "X-Content-Type-Options",
+      "Content-Security-Policy",
+    ]) {
+      const v = res.headers.get(h);
+      if (v) out.set(h, v);
     }
-    console.error(`API Proxy Error for ${endpoint}:`, error.message, error.stack)
+    return new Response(res.status === 204 ? null : res.body, {
+      status: res.status,
+      headers: out,
+    });
+  } catch {
     return NextResponse.json(
-      {
-        error: `Failed to fetch from API for ${endpoint}`,
-        details: error.message,
-      },
-      { status: 500 },
-    )
+      { message: "邮箱服务暂时无法连接，请稍后重试" },
+      { status: 502 },
+    );
   }
 }
-
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const endpoint = searchParams.get("endpoint") || ""
-  const authHeader = request.headers.get("Authorization")
-
-  const headersInit: HeadersInit = {}
-  if (authHeader) {
-    headersInit["Authorization"] = authHeader
-  }
-  // User-Agent 和 Accept 会在 handleRequest 中设置
-
-  return handleRequest(request, endpoint, { headers: headersInit, method: "GET" })
-}
-
-export async function POST(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const endpoint = searchParams.get("endpoint") || ""
-  const authHeader = request.headers.get("Authorization")
-  let body
-  try {
-    body = await request.json()
-  } catch (e) {
-    console.error("Error parsing POST request body:", e)
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
-  }
-
-  const headersInit: HeadersInit = {
-    "Content-Type": "application/json", // POST 请求需要 Content-Type
-  }
-  if (authHeader) {
-    headersInit["Authorization"] = authHeader
-  }
-  // User-Agent 和 Accept 会在 handleRequest 中设置
-
-  return handleRequest(request, endpoint, {
-    method: "POST",
-    headers: headersInit,
-    body: JSON.stringify(body),
-  })
-}
-
-export async function PATCH(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const endpoint = searchParams.get("endpoint") || ""
-  const authHeader = request.headers.get("Authorization")
-
-  let body
-  try {
-    body = await request.json()
-  } catch (e) {
-    console.error("Error parsing PATCH request body:", e)
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
-  }
-
-  const headersInit: HeadersInit = {
-    "Content-Type": "application/merge-patch+json", // mail.tm PATCH 需要这个
-  }
-  if (authHeader) {
-    headersInit["Authorization"] = authHeader
-  }
-  // User-Agent 和 Accept 会在 handleRequest 中设置
-
-  return handleRequest(request, endpoint, {
-    method: "PATCH",
-    headers: headersInit,
-    body: JSON.stringify(body),
-  })
-}
-
-export async function DELETE(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const endpoint = searchParams.get("endpoint") || ""
-  const authHeader = request.headers.get("Authorization")
-
-  const headersInit: HeadersInit = {}
-  if (authHeader) {
-    headersInit["Authorization"] = authHeader
-  }
-  // User-Agent 和 Accept 会在 handleRequest 中设置
-
-  return handleRequest(request, endpoint, { method: "DELETE", headers: headersInit })
-}
+export const GET = handle,
+  POST = handle,
+  PATCH = handle,
+  DELETE = handle;

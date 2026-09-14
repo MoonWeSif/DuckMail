@@ -8,7 +8,7 @@ export const PRESET_PROVIDERS: ApiProvider[] = [
   {
     id: "duckmail",
     name: "DuckMail",
-    baseUrl: "https://api.duckmail.sbs",
+    baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.duckmail.sbs",
     mercureUrl: "https://mercure.duckmail.sbs/.well-known/mercure",
     isCustom: false,
   },
@@ -33,6 +33,8 @@ interface ApiProviderContextType {
   getProviderById: (providerId: string) => ApiProvider | undefined
   apiKey: string
   setApiKey: (apiKey: string) => void
+  /** True once persisted settings have been read from localStorage. */
+  isReady: boolean
 }
 
 const ApiProviderContext = createContext<ApiProviderContextType | undefined>(undefined)
@@ -46,6 +48,7 @@ export function ApiProviderProvider({ children }: ApiProviderProviderProps) {
   // 默认禁用 mail.tm，用户可在设置中手动启用
   const [disabledProviderIds, setDisabledProviderIds] = useState<string[]>(["mailtm"])
   const [apiKey, setApiKeyState] = useState<string>("")
+  const [isReady, setIsReady] = useState(false)
 
   // 所有提供商（预设 + 自定义）
   const providers = [...PRESET_PROVIDERS, ...customProviders]
@@ -57,12 +60,10 @@ export function ApiProviderProvider({ children }: ApiProviderProviderProps) {
 
   // 从localStorage加载设置
   useEffect(() => {
-    console.log(`🔑 [Context] Loading settings from localStorage...`)
     try {
       const savedCustomProviders = localStorage.getItem("custom-api-providers")
       const savedDisabledProviders = localStorage.getItem("disabled-api-providers")
       const savedApiKey = localStorage.getItem("api-key")
-      console.log(`🔑 [Context] Raw API Key from localStorage: ${savedApiKey}`)
 
       if (savedCustomProviders) {
         const parsed = JSON.parse(savedCustomProviders)
@@ -79,14 +80,12 @@ export function ApiProviderProvider({ children }: ApiProviderProviderProps) {
       }
 
       if (savedApiKey) {
-        console.log(`🔑 [Context] Loading API Key from localStorage: ${savedApiKey.substring(0, 10)}...`)
         setApiKeyState(savedApiKey)
-      } else {
-        console.log(`🔑 [Context] No API Key found in localStorage`)
       }
     } catch (error) {
       console.error("Error loading API provider settings:", error)
     }
+    setIsReady(true)
   }, [])
 
 
@@ -136,9 +135,11 @@ export function ApiProviderProvider({ children }: ApiProviderProviderProps) {
 
   // 设置API Key
   const setApiKey = (newApiKey: string) => {
-    console.log(`🔑 [Context] Setting API Key: ${newApiKey ? `${newApiKey.substring(0, 10)}...` : 'null'}`)
-    setApiKeyState(newApiKey)
-    localStorage.setItem("api-key", newApiKey)
+    const normalized = newApiKey.trim().replace(/^Bearer\s+/i, "")
+    setApiKeyState(normalized)
+    localStorage.removeItem("cached-domains")
+    if (normalized) localStorage.setItem("api-key", normalized)
+    else localStorage.removeItem("api-key")
   }
 
   const value: ApiProviderContextType = {
@@ -153,6 +154,7 @@ export function ApiProviderProvider({ children }: ApiProviderProviderProps) {
     getProviderById,
     apiKey,
     setApiKey,
+    isReady,
   }
 
   return (

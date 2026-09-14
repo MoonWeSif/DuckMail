@@ -6,6 +6,7 @@ import { Spinner } from "@heroui/spinner"
 
 import type { Domain } from "@/types"
 import { useTranslations } from "next-intl"
+import { useApiProvider } from "@/contexts/api-provider-context"
 
 interface DomainSelectorProps {
   value: string
@@ -18,8 +19,11 @@ export function DomainSelector({ value, onSelectionChange, isDisabled }: DomainS
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const t = useTranslations("domainSelector")
+  const { apiKey } = useApiProvider()
 
   useEffect(() => {
+    let cancelled = false
+    setDomains([])
     const loadDomains = async () => {
       try {
         setLoading(true)
@@ -49,6 +53,7 @@ export function DomainSelector({ value, onSelectionChange, isDisabled }: DomainS
           try {
             const { fetchDomainsFromProvider } = await import("@/lib/api")
             const providerDomains = await fetchDomainsFromProvider(provider.id)
+            if (cancelled) return
 
             if (providerDomains.length > 0) {
               const domainsWithProvider = providerDomains.map(domain => ({
@@ -58,6 +63,7 @@ export function DomainSelector({ value, onSelectionChange, isDisabled }: DomainS
               }))
 
               setDomains(prevDomains => {
+                if (cancelled) return prevDomains
                 const existingKeys = new Set(
                   prevDomains.map(d => `${d.providerId || "duckmail"}:${d.domain}`)
                 )
@@ -85,7 +91,7 @@ export function DomainSelector({ value, onSelectionChange, isDisabled }: DomainS
             console.error(`❌ [DomainSelector] Failed to fetch domains from ${provider.name}:`, err)
           } finally {
             completedCount++
-            if (completedCount === enabledProviders.length) {
+            if (!cancelled && completedCount === enabledProviders.length) {
               if (!hasAnySuccess) {
                 setError(t("allFailed"))
               }
@@ -98,13 +104,15 @@ export function DomainSelector({ value, onSelectionChange, isDisabled }: DomainS
 
       } catch (err) {
         console.error("Failed to load domains:", err)
+        if (cancelled) return
         setError(t("fetchFailed"))
         setLoading(false)
       }
     }
 
     loadDomains()
-  }, [t])
+    return () => { cancelled = true }
+  }, [t, apiKey])
 
   if (loading) {
     return (

@@ -70,7 +70,7 @@ const ApiEndpointCard = ({ endpoint, t }: { endpoint: any; t: any }) => {
         headers,
         body: endpoint.method !== "GET" ? body : undefined,
       })
-      const data = await res.json()
+      const data = res.status === 204 ? {status:204} : await res.json()
       if (!res.ok) throw data
       setResponse(data)
     } catch (err: any) {
@@ -175,6 +175,16 @@ export default function ApiDocsPage() {
 
   // API 端点数据（使用翻译 key）
   const apiEndpoints = [
+    {
+      group: "Microsoft 托管",
+      endpoints: [
+        {method:"GET",path:"/accounts",description:"使用同一个 API Key 列出全部自有托管账号。",authType:"optional-apikey"},
+        {method:"POST",path:"/accounts/imports",description:"批量导入，password 为独立 DuckMail 访问密码。使用本人的 API Key；返回 202 后查询导入结果。",authType:"optional-apikey",body:JSON.stringify({entries:[{source:"microsoft",address:"example@outlook.com",password:"<独立DuckMail访问密码>",connection:{protocol:"auto",clientId:"<原应用client_id>",refreshToken:"<refresh_token>"},tags:[]}]},null,2)},
+        {method:"GET",path:"/accounts/imports/{importId}",description:"逐行查看验证和创建结果。不会返回 Microsoft 授权或密码。",authType:"optional-apikey",pathParams:[{name:"importId",value:""}]},
+        {method:"POST",path:"/accounts/{id}/token",description:"用 account:access Key 取得单账号 token，然后继续调用现有 /me、/messages。",authType:"optional-apikey",pathParams:[{name:"id",value:""}]},
+        {method:"GET",path:"/messages?folder=junk",description:"用账号 token 查看垃圾邮件。检查响应 sync 状态；本地缓存不等于完整远端邮箱。",authType:"required-token"},
+      ],
+    },
     {
       group: t("domainGroup"),
       endpoints: [

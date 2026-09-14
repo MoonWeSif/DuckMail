@@ -1,394 +1,467 @@
 "use client"
 
-import { Button } from "@heroui/button"
-import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection } from "@heroui/dropdown"
+import { useCallback, useEffect, useState, type Key } from "react"
 import { Avatar } from "@heroui/avatar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Sun, Moon, Languages, User, UserPlus, LogOut, Trash2, Copy, Check, Wifi, Settings, Eye, EyeOff, KeyRound } from "lucide-react"
+import { Button } from "@heroui/button"
+import { Chip } from "@heroui/chip"
+import {
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownSection,
+  DropdownTrigger,
+} from "@heroui/dropdown"
+import { Tooltip } from "@heroui/react"
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Languages,
+  LogIn,
+  LogOut,
+  Moon,
+  PauseCircle,
+  RefreshCw,
+  Settings,
+  ShieldAlert,
+  Sun,
+  Trash2,
+  User,
+  UserPlus,
+  Wifi,
+  Zap,
+} from "lucide-react"
 import { useTheme } from "next-themes"
-import { useState, useEffect, useCallback } from "react"
+import { useLocale, useTranslations } from "next-intl"
+import { formatDistanceToNow } from "date-fns"
+import { enUS, zhCN } from "date-fns/locale"
 import { useAuth } from "@/contexts/auth-context"
-import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useMailStatus } from "@/contexts/mail-status-context"
-import { SettingsPanel } from "@/components/settings-panel"
-import { useTranslations, useLocale } from "next-intl"
+import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 
 interface HeaderProps {
   onCreateAccount: () => void
+  onQuickCreate: () => void
+  onLogin: () => void
   onLocaleChange: () => void
-  onLogin?: () => void
+  onOpenSettings: () => void
+  onRefresh: () => void
   isMobile?: boolean
 }
 
-export default function Header({ onCreateAccount, onLocaleChange, onLogin, isMobile = false }: HeaderProps) {
+const PANEL_URL = "https://domain.duckmail.sbs"
+const initials = (address: string) => (address ? address.slice(0, 2).toUpperCase() : "?")
+
+export default function Header({
+  onCreateAccount,
+  onQuickCreate,
+  onLogin,
+  onLocaleChange,
+  onOpenSettings,
+  onRefresh,
+  isMobile = false,
+}: HeaderProps) {
   const { theme, setTheme } = useTheme()
-  const { isAuthenticated, currentAccount, accounts, logout, switchAccount, deleteAccount } = useAuth()
+  const { isAuthenticated, currentAccount, logout, deleteAccount } = useAuth()
+  const { isEnabled, setIsEnabled } = useMailStatus()
+  const { toast } = useHeroUIToast()
+  const t = useTranslations("header")
+  const tc = useTranslations("common")
+  const locale = useLocale()
+
   const [mounted, setMounted] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
   const [copiedPassword, setCopiedPassword] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const { toast } = useHeroUIToast()
-  const { isEnabled, setIsEnabled } = useMailStatus()
-  const t = useTranslations("header")
-  const tc = useTranslations("common")
-  const locale = useLocale()
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleCopyToClipboard = useCallback(
-    async (text: string, type: string) => {
+  useEffect(() => {
+    setShowPassword(false)
+  }, [currentAccount?.id])
+
+  const copy = useCallback(
+    async (text: string, kind: "email" | "password") => {
       try {
         await navigator.clipboard.writeText(text)
-        if (type === "email") setCopiedEmail(true)
-        toast({ title: type === "email" ? tc("emailCopied") : tc("contentCopied"), description: text })
-        setTimeout(() => {
-          if (type === "email") setCopiedEmail(false)
-        }, 2000)
+        if (kind === "email") {
+          setCopiedEmail(true)
+          setTimeout(() => setCopiedEmail(false), 2000)
+          toast({ title: tc("emailCopied"), description: text })
+        } else {
+          setCopiedPassword(true)
+          setTimeout(() => setCopiedPassword(false), 2000)
+          toast({ title: t("passwordCopied") })
+        }
       } catch (err) {
         toast({ title: tc("copyFailed"), description: tc("clipboardError"), color: "danger", variant: "flat" })
         console.error("Failed to copy: ", err)
       }
     },
-    [toast, tc],
+    [toast, t, tc],
   )
 
-  if (!mounted) return null
-
-  const getInitials = (email: string) => {
-    return email ? email.substring(0, 2).toUpperCase() : "NA"
-  }
-
-  const getRandomColor = (email: string) => {
-    if (!email) return "default"
-    const colors = ["primary", "secondary", "success", "warning", "danger"]
-    const hash = email.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    return colors[hash % colors.length]
-  }
-
   const toggleMailChecker = () => {
-    const newState = !isEnabled
-    setIsEnabled(newState)
-
+    const next = !isEnabled
+    setIsEnabled(next)
     toast({
-      title: newState ? t("mailCheckEnabled") : t("mailCheckDisabled"),
-      description: newState ? t("mailCheckEnabledDesc") : t("mailCheckDisabledDesc"),
-      color: newState ? "success" : "warning",
+      title: next ? t("mailCheckEnabled") : t("mailCheckDisabled"),
+      description: next ? t("mailCheckEnabledDesc") : t("mailCheckDisabledDesc"),
+      color: next ? "success" : "warning",
       variant: "flat",
       icon: <Wifi size={16} />,
     })
   }
 
+  if (!mounted) return null
+
+  const signedIn = isAuthenticated && !!currentAccount
+  const hosted = currentAccount?.source === "microsoft"
+  const sync = currentAccount?.hosting
+  const syncState = hosted
+    ? sync?.status === "needs_reauth"
+      ? { icon: <ShieldAlert size={14} className="text-warning" />, text: t("needsReauth") }
+      : sync?.paused
+        ? { icon: <PauseCircle size={14} className="text-default-400" />, text: t("syncPaused") }
+        : sync?.lastSuccessAt
+          ? {
+              icon: <RefreshCw size={14} className="text-success" />,
+              text: t("lastSync", {
+                time: formatDistanceToNow(new Date(sync.lastSuccessAt), {
+                  addSuffix: true,
+                  locale: locale === "en" ? enUS : zhCN,
+                }),
+              }),
+            }
+          : { icon: <RefreshCw size={14} className="text-default-400" />, text: t("notSynced") }
+    : null
+
+  const handleMenuAction = (key: Key) => {
+    switch (key) {
+      case "copy-address":
+        if (currentAccount) copy(currentAccount.address, "email")
+        break
+      case "panel":
+        window.open(PANEL_URL, "_blank", "noopener,noreferrer")
+        break
+      case "login":
+        onLogin()
+        break
+      case "quick":
+        onQuickCreate()
+        break
+      case "create":
+        onCreateAccount()
+        break
+      case "remove":
+        logout()
+        break
+      case "delete":
+        if (currentAccount) deleteAccount(currentAccount.id)
+        break
+    }
+  }
+
+  const iconButton = "text-default-500"
+
   return (
-    <header className={`h-16 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 ${isMobile ? 'px-4' : 'px-6'} flex items-center justify-between`}>
-      <div className="flex items-center space-x-2 flex-1 min-w-0">
-        {isAuthenticated && currentAccount ? (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="light"
-                  className={`text-sm font-medium text-gray-800 dark:text-white p-2 h-auto bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 ${isMobile ? 'max-w-[200px] truncate' : ''}`}
-                  onPress={() => handleCopyToClipboard(currentAccount.address, "email")}
-                  endContent={
-                    copiedEmail ? (
-                      <Check size={16} className="text-green-500" />
-                    ) : (
-                      <Copy size={16} className="text-gray-500 dark:text-gray-300" />
-                    )
-                  }
-                >
-                  <span className={isMobile ? 'truncate' : ''}>{currentAccount.address}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>{copiedEmail ? tc("copied") : tc("copyEmailTooltip")}</p>
-              </TooltipContent>
+    <header
+      className={`flex h-16 items-center justify-between gap-3 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 ${isMobile ? "px-3" : "px-6"}`}
+    >
+      {/* Current mailbox address */}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {signedIn && currentAccount ? (
+          <>
+            <Tooltip content={copiedEmail ? tc("copied") : tc("copyEmailTooltip")} size="sm" closeDelay={0}>
+              <Button
+                variant="flat"
+                size="sm"
+                className="h-9 min-w-0 max-w-full gap-2 px-3 font-medium"
+                onPress={() => copy(currentAccount.address, "email")}
+                endContent={
+                  copiedEmail ? (
+                    <Check size={15} className="shrink-0 text-success" />
+                  ) : (
+                    <Copy size={15} className="shrink-0 text-default-400" />
+                  )
+                }
+              >
+                <span className="truncate">{currentAccount.address}</span>
+              </Button>
             </Tooltip>
-          </TooltipProvider>
-        ) : (
-          <div className="w-px h-6" />
-        )}
+            {!isMobile && (
+              <Chip size="sm" variant="flat" color={hosted ? "secondary" : "primary"} className="hidden sm:flex">
+                {hosted ? t("hostedMailbox") : t("tempMailbox")}
+              </Chip>
+            )}
+          </>
+        ) : null}
       </div>
 
-      <div className={`flex items-center ${isMobile ? 'space-x-1' : 'space-x-2'}`}>
-        {/* 邮件检查切换按钮 */}
-        {isAuthenticated && currentAccount && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  isIconOnly
-                  variant="light"
-                  size="sm"
-                  onPress={toggleMailChecker}
-                  className="text-gray-600 dark:text-gray-300"
-                  aria-label={isEnabled ? t("disableMailCheck") : t("enableMailCheck")}
-                >
-                  <Wifi
-                    size={16}
-                    className={isEnabled ? "text-green-500" : "text-gray-400"}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs">
-                <div className="space-y-1">
-                  <p className="font-medium text-sm">
-                    {isEnabled ? t("mailAutoCheckOn") : t("mailAutoCheckOff")}
-                  </p>
-                  <p className="text-xs text-gray-600">
+      {/* Actions */}
+      <div className={`flex shrink-0 items-center ${isMobile ? "gap-0" : "gap-1"}`}>
+        {signedIn && (
+          <>
+            <Tooltip content={t("refresh")} size="sm" closeDelay={0}>
+              <Button isIconOnly variant="light" size="sm" className={iconButton} aria-label={t("refresh")} onPress={onRefresh}>
+                <RefreshCw size={17} />
+              </Button>
+            </Tooltip>
+            <Tooltip
+              size="sm"
+              closeDelay={0}
+              content={
+                <div className="max-w-56 py-0.5">
+                  <p className="text-tiny font-medium">{isEnabled ? t("mailAutoCheckOn") : t("mailAutoCheckOff")}</p>
+                  <p className="text-tiny text-default-500">
                     {isEnabled ? t("mailAutoCheckOnDesc") : t("mailAutoCheckOffDesc")}
                   </p>
                 </div>
-              </TooltipContent>
+              }
+            >
+              <Button
+                isIconOnly
+                variant="light"
+                size="sm"
+                className={iconButton}
+                aria-label={isEnabled ? t("disableMailCheck") : t("enableMailCheck")}
+                onPress={toggleMailChecker}
+              >
+                <Wifi size={17} className={isEnabled ? "text-success" : "text-default-400"} />
+              </Button>
             </Tooltip>
-          </TooltipProvider>
+          </>
         )}
 
-        <Button
-          isIconOnly
-          variant="light"
-          size="sm"
-          onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="text-gray-600 dark:text-gray-300"
-          aria-label={theme === "dark" ? t("switchToLight") : t("switchToDark")}
-        >
-          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-        </Button>
+        <Tooltip content={theme === "dark" ? t("switchToLight") : t("switchToDark")} size="sm" closeDelay={0}>
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            className={iconButton}
+            aria-label={theme === "dark" ? t("switchToLight") : t("switchToDark")}
+            onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+          </Button>
+        </Tooltip>
 
-        <Button
-          isIconOnly
-          variant="light"
-          size="sm"
-          onPress={onLocaleChange}
-          className="text-gray-600 dark:text-gray-300"
-          aria-label={locale === "en" ? t("switchToChinese") : t("switchToEnglish")}
-        >
-          <Languages size={18} />
-        </Button>
+        <Tooltip content={locale === "en" ? t("switchToChinese") : t("switchToEnglish")} size="sm" closeDelay={0}>
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            className={iconButton}
+            aria-label={locale === "en" ? t("switchToChinese") : t("switchToEnglish")}
+            onPress={onLocaleChange}
+          >
+            <Languages size={17} />
+          </Button>
+        </Tooltip>
 
-        <Button
-          isIconOnly
-          variant="light"
-          size="sm"
-          onPress={() => setIsSettingsOpen(true)}
-          className="text-gray-600 dark:text-gray-300"
-          aria-label={t("settings")}
-        >
-          <Settings size={18} />
-        </Button>
+        <Tooltip content={t("settings")} size="sm" closeDelay={0}>
+          <Button isIconOnly variant="light" size="sm" className={iconButton} aria-label={t("settings")} onPress={onOpenSettings}>
+            <Settings size={17} />
+          </Button>
+        </Tooltip>
 
-        <Dropdown placement="bottom-end">
+        <Dropdown placement="bottom-end" classNames={{ content: "min-w-[280px] p-1" }}>
           <DropdownTrigger>
-            <Button isIconOnly variant="light" size="sm" className="text-gray-600 dark:text-gray-300">
-              {isAuthenticated && currentAccount ? (
+            <Button isIconOnly variant="light" size="sm" aria-label={t("currentAccount")} className={`ml-1 ${iconButton}`}>
+              {signedIn && currentAccount ? (
                 <Avatar
-                  name={getInitials(currentAccount.address)}
-                  color={getRandomColor(currentAccount.address) as any}
                   size="sm"
+                  name={initials(currentAccount.address)}
+                  classNames={{
+                    base: "h-7 w-7 bg-primary",
+                    name: "text-tiny font-semibold text-primary-foreground",
+                  }}
                 />
               ) : (
                 <User size={18} />
               )}
             </Button>
           </DropdownTrigger>
-          <DropdownMenu aria-label="User actions" className="max-h-[70vh] overflow-y-auto">
-            {[
-              ...(isAuthenticated && currentAccount ? [
-                <DropdownSection key="current-account" title={t("currentAccount")} showDivider>
-                  <DropdownItem
-                    key="current-email"
-                    textValue={currentAccount.address}
-                    onPress={() => handleCopyToClipboard(currentAccount.address, "email")}
-                    endContent={
-                      copiedEmail ? (
-                        <Check size={16} className="text-green-500" />
-                      ) : (
-                        <Copy size={16} className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white" />
-                      )
-                    }
-                    className="py-3 cursor-pointer"
-                  >
-                    <div className="font-semibold text-gray-800 dark:text-white text-sm">
-                      {currentAccount.address}
-                    </div>
-                  </DropdownItem>
-                  {currentAccount.password ? (
+
+          <DropdownMenu
+            aria-label={t("currentAccount")}
+            variant="flat"
+            onAction={handleMenuAction}
+            itemClasses={{ description: "text-tiny" }}
+          >
+            {signedIn && currentAccount
+              ? [
+                  <DropdownSection key="current" showDivider aria-label={t("currentAccount")}>
                     <DropdownItem
-                      key="current-password"
-                      textValue="password"
+                      key="profile"
                       isReadOnly
-                      className="py-2 cursor-default"
+                      textValue={currentAccount.address}
+                      className="cursor-default opacity-100 data-[hover=true]:bg-transparent"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <KeyRound size={14} className="text-gray-400 flex-shrink-0" />
-                          <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                      <div className="flex items-center gap-3 py-0.5">
+                        <Avatar
+                          size="sm"
+                          name={initials(currentAccount.address)}
+                          classNames={{
+                            base: "h-9 w-9 shrink-0 bg-primary",
+                            name: "text-small font-semibold text-primary-foreground",
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-small font-medium text-foreground">{currentAccount.address}</p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <Chip size="sm" variant="flat" color={hosted ? "secondary" : "primary"} className="h-5">
+                              {hosted ? t("hostedMailbox") : t("tempMailbox")}
+                            </Chip>
+                            {currentAccount.label && (
+                              <span className="truncate text-tiny text-default-500">{currentAccount.label}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Tooltip content={copiedEmail ? tc("copied") : t("copyAddress")} size="sm" closeDelay={0}>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            aria-label={t("copyAddress")}
+                            className="h-7 w-7 min-w-7 text-default-500"
+                            onPress={() => copy(currentAccount.address, "email")}
+                          >
+                            {copiedEmail ? <Check size={15} className="text-success" /> : <Copy size={15} />}
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    </DropdownItem>
+
+                    {!hosted && currentAccount.password ? (
+                      <DropdownItem
+                        key="password"
+                        isReadOnly
+                        textValue={t("accessPassword")}
+                        className="cursor-default opacity-100 data-[hover=true]:bg-transparent"
+                      >
+                        <div className="flex items-center gap-2">
+                          <KeyRound size={14} className="shrink-0 text-default-400" />
+                          <span className="min-w-0 flex-1 truncate font-mono text-tiny text-default-500">
                             {showPassword ? currentAccount.password : "••••••••••••"}
                           </span>
+                          <Tooltip content={showPassword ? t("hidePassword") : t("showPassword")} size="sm" closeDelay={0}>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+                              className="h-6 w-6 min-w-6 text-default-500"
+                              onPress={() => setShowPassword((v) => !v)}
+                            >
+                              {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content={t("copyPassword")} size="sm" closeDelay={0}>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              aria-label={t("copyPassword")}
+                              className="h-6 w-6 min-w-6 text-default-500"
+                              onPress={() => copy(currentAccount.password!, "password")}
+                            >
+                              {copiedPassword ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+                            </Button>
+                          </Tooltip>
                         </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setShowPassword(!showPassword)
-                            }}
-                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          >
-                            {showPassword ? (
-                              <EyeOff size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
-                            ) : (
-                              <Eye size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigator.clipboard.writeText(currentAccount.password!)
-                              setCopiedPassword(true)
-                              toast({ title: t("passwordCopied") })
-                              setTimeout(() => setCopiedPassword(false), 2000)
-                            }}
-                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          >
-                            {copiedPassword ? (
-                              <Check size={14} className="text-green-500" />
-                            ) : (
-                              <Copy size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
-                            )}
-                          </button>
+                      </DropdownItem>
+                    ) : null}
+
+                    {syncState ? (
+                      <DropdownItem
+                        key="sync"
+                        isReadOnly
+                        textValue={syncState.text}
+                        className="cursor-default opacity-100 data-[hover=true]:bg-transparent"
+                      >
+                        <div className="flex items-center gap-2 text-tiny text-default-500">
+                          <span className="shrink-0">{syncState.icon}</span>
+                          <span className="truncate">{syncState.text}</span>
+                        </div>
+                      </DropdownItem>
+                    ) : null}
+                  </DropdownSection>,
+
+                  <DropdownSection key="actions" showDivider aria-label="actions">
+                    {hosted ? (
+                      <DropdownItem key="panel" startContent={<ExternalLink size={16} className="text-default-500" />}>
+                        {t("openPanel")}
+                      </DropdownItem>
+                    ) : null}
+                    <DropdownItem key="login" startContent={<LogIn size={16} className="text-default-500" />}>
+                      {t("loginAnother")}
+                    </DropdownItem>
+                    <DropdownItem key="create" startContent={<UserPlus size={16} className="text-default-500" />}>
+                      {t("createNew")}
+                    </DropdownItem>
+                  </DropdownSection>,
+
+                  <DropdownSection key="danger" aria-label="danger">
+                    <DropdownItem
+                      key="remove"
+                      startContent={<LogOut size={16} className="text-default-500" />}
+                      description={t("removeFromDeviceDesc")}
+                    >
+                      {t("removeFromDevice")}
+                    </DropdownItem>
+                    {!hosted ? (
+                      <DropdownItem
+                        key="delete"
+                        color="danger"
+                        className="text-danger"
+                        startContent={<Trash2 size={16} />}
+                        description={t("deleteForeverDesc")}
+                      >
+                        {t("deleteForever")}
+                      </DropdownItem>
+                    ) : null}
+                  </DropdownSection>,
+                ]
+              : [
+                  <DropdownSection key="signed-out-section" showDivider aria-label={t("notSignedIn")}>
+                    <DropdownItem
+                      key="signed-out"
+                      isReadOnly
+                      textValue={t("notSignedIn")}
+                      className="cursor-default opacity-100 data-[hover=true]:bg-transparent"
+                    >
+                      <div className="flex items-center gap-3 py-0.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-default-100">
+                          <User size={16} className="text-default-500" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-small font-medium text-foreground">{t("notSignedIn")}</p>
+                          <p className="text-tiny text-default-500">{t("notSignedInDesc")}</p>
                         </div>
                       </div>
                     </DropdownItem>
-                  ) : null}
-                </DropdownSection>
-              ] : []),
-
-              ...(isAuthenticated && accounts.length > 1 ? [
-                <DropdownSection key="switch-accounts" title={t("switchAccount")} showDivider>
-                  {(() => {
-                    const accountsByProvider = accounts.reduce((acc, account) => {
-                      const providerId = account.providerId || "duckmail"
-                      if (!acc[providerId]) {
-                        acc[providerId] = []
-                      }
-                      acc[providerId].push(account)
-                      return acc
-                    }, {} as Record<string, typeof accounts>)
-
-                    const getProviderName = (providerId: string) => {
-                      switch (providerId) {
-                        case "duckmail": return "DuckMail"
-                        case "mailtm": return "Mail.tm"
-                        default: return providerId
-                      }
-                    }
-
-                    return Object.entries(accountsByProvider).flatMap(([providerId, providerAccounts]) => [
-                      ...(Object.keys(accountsByProvider).length > 1 ? [
-                        <DropdownItem key={`provider-${providerId}`} className="opacity-60 cursor-default pointer-events-none">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${
-                              providerId === 'duckmail' ? 'bg-blue-500' :
-                              providerId === 'mailtm' ? 'bg-green-500' : 'bg-purple-500'
-                            }`} />
-                            <span className="text-xs font-medium text-gray-600">
-                              {getProviderName(providerId)}
-                            </span>
-                          </div>
-                        </DropdownItem>
-                      ] : []),
-                      ...providerAccounts
-                        .filter((account) => account.address !== currentAccount?.address)
-                        .map((account) => (
-                          <DropdownItem
-                            key={account.id}
-                            startContent={
-                              <Avatar
-                                name={getInitials(account.address)}
-                                color={getRandomColor(account.address) as any}
-                                size="sm"
-                              />
-                            }
-                            onPress={async () => {
-                              try {
-                                await switchAccount(account)
-                              } catch (error) {
-                                toast({
-                                  title: t("accountSwitchFailed"),
-                                  description: t("accountSwitchFailedDesc"),
-                                  color: "danger",
-                                  variant: "flat"
-                                })
-                              }
-                            }}
-                            textValue={account.address}
-                            className={`py-2 ${Object.keys(accountsByProvider).length > 1 ? "pl-6" : ""}`}
-                          >
-                            <div className="text-gray-800 dark:text-white text-sm">
-                              {account.address}
-                            </div>
-                          </DropdownItem>
-                        ))
-                    ])
-                  })()}
-                </DropdownSection>
-              ] : []),
-
-              <DropdownSection key="account-actions" aria-label="Account Actions">
-                {isAuthenticated && currentAccount ? (
-                  <>
-                    <DropdownItem key="login_another" startContent={<User size={16} />} onPress={onLogin || (() => {})}>
-                      {t("loginAnother")}
+                  </DropdownSection>,
+                  <DropdownSection key="signed-out-actions" aria-label="actions">
+                    <DropdownItem key="quick" startContent={<Zap size={16} className="text-warning" />}>
+                      {t("quickCreate")}
                     </DropdownItem>
-                    <DropdownItem key="create_another" startContent={<UserPlus size={16} />} onPress={onCreateAccount}>
-                      {t("createNew")}
+                    <DropdownItem key="create" startContent={<UserPlus size={16} className="text-default-500" />}>
+                      {t("customCreate")}
                     </DropdownItem>
-                    <DropdownItem
-                      key="delete"
-                      className="text-danger"
-                      color="danger"
-                      startContent={<Trash2 size={16} />}
-                      onPress={() => currentAccount && deleteAccount(currentAccount.id)}
-                    >
-                      {t("deleteCurrent")}
-                    </DropdownItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownItem key="login" startContent={<User size={16} />} onPress={onLogin || (() => {})}>
+                    <DropdownItem key="login" startContent={<LogIn size={16} className="text-default-500" />}>
                       {t("loginExisting")}
                     </DropdownItem>
-                    <DropdownItem key="create" startContent={<UserPlus size={16} />} onPress={onCreateAccount}>
-                      {t("createNew")}
-                    </DropdownItem>
-                  </>
-                )}
-              </DropdownSection>
-            ]}
+                  </DropdownSection>,
+                ]}
           </DropdownMenu>
         </Dropdown>
-
-        {isAuthenticated && (
-          <Button
-            isIconOnly
-            variant="light"
-            size="sm"
-            onPress={logout}
-            className="text-gray-600 dark:text-gray-300"
-            aria-label={t("logout")}
-          >
-            <LogOut size={18} />
-          </Button>
-        )}
       </div>
-
-      <SettingsPanel
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
     </header>
   )
 }

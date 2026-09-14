@@ -1,7 +1,7 @@
 import type { Account, Domain, Message, MessageDetail } from "@/types"
 
 // 直接指向 DuckMail API 服务（默认提供商）
-const API_BASE_URL = "https://api.duckmail.sbs"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.duckmail.sbs"
 
 // 获取默认API提供商配置（用于向后兼容）
 function getDefaultProviderConfig() {
@@ -51,10 +51,9 @@ function createHeadersWithApiKey(additionalHeaders: Record<string, string> = {},
     ...additionalHeaders,
   }
 
-  const apiKey = getApiKey()
+  const apiKey = (!providerId || providerId === "duckmail") ? getApiKey() : ""
   if (apiKey && apiKey.trim()) {
     const trimmedApiKey = apiKey.trim()
-    console.log(`🔑 [API] Using API Key for domain/account operation: ${trimmedApiKey.substring(0, 10)}...`)
 
     if (trimmedApiKey.startsWith('Bearer ')) {
       headers["Authorization"] = trimmedApiKey
@@ -80,11 +79,10 @@ function createHeadersWithToken(token: string, additionalHeaders: Record<string,
 }
 
 // 获取当前存储的 API Key
-function getApiKey(): string {
+export function getApiKey(): string {
   if (typeof window === "undefined") return ""
   const apiKey = localStorage.getItem("api-key") || ""
-  console.log(`🔑 [API] getApiKey called, found: ${apiKey ? `${apiKey.substring(0, 10)}...` : 'null'}`)
-  return apiKey
+  return apiKey.trim().replace(/^Bearer\s+/i, "")
 }
 
 // 从邮箱地址推断提供商ID
@@ -102,7 +100,6 @@ function inferProviderFromEmail(email: string): string {
 
     // 检查是否是已知域名
     if (knownDomainPatterns[domain]) {
-      console.log(`📍 [API] Domain ${domain} mapped to provider: ${knownDomainPatterns[domain]}`)
       return knownDomainPatterns[domain]
     }
 
@@ -112,13 +109,11 @@ function inferProviderFromEmail(email: string): string {
       const domains = JSON.parse(cachedDomains)
       const matchedDomain = domains.find((d: any) => d.domain === domain)
       if (matchedDomain && matchedDomain.providerId) {
-        console.log(`📍 [API] Domain ${domain} found in cache, provider: ${matchedDomain.providerId}`)
         return matchedDomain.providerId
       }
     }
 
     // 如果没有找到匹配的域名，返回默认提供商
-    console.log(`⚠️ [API] Domain ${domain} not found, using default provider: duckmail`)
     return "duckmail"
   } catch (error) {
     console.error("Error inferring provider from email:", error)
@@ -136,7 +131,7 @@ function getProviderConfig(providerId: string) {
       {
         id: "duckmail",
         name: "DuckMail",
-        baseUrl: "https://api.duckmail.sbs",
+        baseUrl: API_BASE_URL,
         mercureUrl: "https://mercure.duckmail.sbs/.well-known/mercure",
       },
       {
@@ -165,7 +160,7 @@ function getProviderConfig(providerId: string) {
     return {
       id: "duckmail",
       name: "DuckMail",
-      baseUrl: "https://api.duckmail.sbs",
+      baseUrl: API_BASE_URL,
       mercureUrl: "https://mercure.duckmail.sbs/.well-known/mercure",
     }
   }
@@ -228,6 +223,10 @@ function shouldRetry(status: number): boolean {
 }
 
 interface StoredAccountSnapshot {
+  id: string
+  source?: string
+  loginMethod?: string
+
   address: string
   password?: string
   token?: string
@@ -248,6 +247,7 @@ function getCurrentAccountFromStorage(): StoredAccountSnapshot | null {
 
     return {
       address: currentAccount.address,
+      id: currentAccount.id, source:currentAccount.source, loginMethod:currentAccount.loginMethod,
       password: currentAccount.password,
       token: currentAccount.token || parsed.token,
       providerId: currentAccount.providerId || "duckmail"
@@ -311,7 +311,6 @@ function updateTokenInStorage(address: string, newToken: string): void {
     }
 
     localStorage.setItem("auth", JSON.stringify(parsed))
-    console.log(`🔄 [API] Token refreshed and saved to storage for ${address}`)
 
     // 触发自定义事件，通知auth-context更新React state
     window.dispatchEvent(new CustomEvent("token-refreshed", { detail: { token: newToken, address } }))
@@ -325,20 +324,22 @@ const refreshTokenPromises = new Map<string, Promise<string | null>>()
 
 // 尝试刷新 *指定账户* 的 token（在收到401时调用）
 async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string | null> {
+  if(account.source === "microsoft") {
+    if(account.loginMethod !== "apiKey") return null
+    try { const {exchangeHostedToken}=await import("./hosting-api");const {token}=await exchangeHostedToken(account.id);updateTokenInStorage(account.address,token);return token } catch {return null}
+  }
+
   const inflight = refreshTokenPromises.get(account.address)
   if (inflight) {
-    console.log(`⏳ [API] Token refresh already in progress for ${account.address}, waiting...`)
     return inflight
   }
 
   if (!account.password) {
-    console.log("⚠️ [API] Cannot refresh token: no password stored")
     return null
   }
 
   const promise = (async () => {
     try {
-      console.log("🔄 [API] Attempting to refresh token for:", account.address)
       const headers = {
         ...createBaseHeaders(account.providerId),
         "Content-Type": "application/json",
@@ -351,7 +352,6 @@ async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string |
       })
 
       if (!res.ok) {
-        console.log("❌ [API] Token refresh failed:", res.status)
         return null
       }
 
@@ -360,7 +360,6 @@ async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string |
       if (!newToken) return null
 
       updateTokenInStorage(account.address, newToken)
-      console.log("✅ [API] Token refreshed successfully")
       return newToken
     } catch (error) {
       console.error("❌ [API] Token refresh error:", error)
@@ -395,22 +394,18 @@ async function fetchWithTokenRefresh(
     : failingToken === current.token
 
   if (!belongsToCurrent) {
-    console.log("⚠️ [API] Received 401 for a non-current account token, skipping refresh")
     return response
   }
 
   // 存储中已有更新的 token（例如并发刷新已完成），先直接复用
   if (current.token && current.token !== failingToken) {
-    console.log("🔄 [API] Received 401, retrying with newer stored token...")
     response = await fetch(url, withBearerToken(options, current.token))
     if (response.status !== 401) return response
   }
 
-  console.log("⚠️ [API] Received 401, attempting token refresh...")
   const newToken = await tryRefreshToken(current)
   if (!newToken) return response
 
-  console.log("🔄 [API] Retrying request with new token...")
   return fetch(url, withBearerToken(options, newToken))
 }
 
@@ -425,14 +420,12 @@ async function retryFetch<T>(fn: () => Promise<T>, retries = 1, delay = 500): Pr
       if (statusMatch) {
         const status = parseInt(statusMatch[1])
         if (!shouldRetry(status)) {
-          console.log(`Status ${status} should not be retried, throwing error immediately`)
           throw error
         }
       }
     }
 
     if (retries > 0) {
-      console.log(`Retrying... ${retries} attempts left`)
       await new Promise((resolve) => setTimeout(resolve, delay))
       return retryFetch(fn, retries - 1, delay)
     }
@@ -454,7 +447,6 @@ async function authorizedRequest(
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}))
-      console.log(`❌ [API] ${init.method || "GET"} ${endpoint} failed - Status: ${res.status}`)
       throw new Error(getErrorMessage(res.status, error))
     }
 
@@ -469,12 +461,10 @@ export async function fetchDomainsFromProvider(providerId: string): Promise<Doma
     // 使用 API Key 认证，以便获取用户私有域名
     const headers = createHeadersWithApiKey({ "Cache-Control": "no-cache" }, providerId)
 
-    console.log(`📤 [API] fetchDomainsFromProvider baseUrl=${baseUrl}`)
 
     const response = await retryFetch(async () => {
       const res = await fetch(buildProxyUrl('/domains'), { headers })
 
-      console.log(`📥 [API] Response status: ${res.status}`)
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`)
@@ -494,16 +484,13 @@ export async function fetchDomainsFromProvider(providerId: string): Promise<Doma
         availableDomains = data["hydra:member"].filter((domain: any) => {
           // 必须已验证才能使用
           if (!domain.isVerified) {
-            console.log(`🚫 [API] [DuckMail] Filtering out unverified domain: ${domain.domain}`)
             return false
           }
 
-          console.log(`✅ [API] [DuckMail] Including available domain: ${domain.domain} (verified: ${domain.isVerified})`)
           return true
         })
       } else {
         // 其他提供商：不进行过滤，直接使用所有域名
-        console.log(`✅ [API] [${providerId}] Using all domains without filtering (${availableDomains.length} domains)`)
       }
 
       // 为每个域名添加提供商信息
@@ -579,7 +566,6 @@ export async function createAccount(address: string, password: string, providerI
   }
 
   const baseUrl = getApiBaseUrlForProvider(providerId)
-  console.log(`🔧 [API] Creating account ${address} with provider: ${providerId}`)
 
   // 使用 API Key 认证，以便在私有域名下创建账户
   const headers = createHeadersWithApiKey({ "Content-Type": "application/json" }, providerId)
@@ -690,4 +676,17 @@ export async function deleteMessage(token: string, id: string, providerId?: stri
 // 删除账户（只需要 JWT Token）- 带自动token刷新
 export async function deleteAccount(token: string, id: string, providerId?: string): Promise<void> {
   await authorizedRequest(`/accounts/${id}`, token, providerId, { method: "DELETE" })
+}
+
+export async function getHostedMessagePage(token:string,page=1,folder="inbox",filters:Record<string,string>={}) {
+  const query=new URLSearchParams({page:String(page),folder,...Object.fromEntries(Object.entries(filters).filter(([,v])=>v))})
+  const res=await authorizedRequest(`/messages?${query}`,token,"duckmail")
+  const data=await res.json()
+  return {messages:(data["hydra:member"]||[]) as Message[],total:data["hydra:totalItems"]||0,sync:data.sync as import("@/types").HostingStatus}
+}
+export async function syncHostedAccount(token:string,id:string){await authorizedRequest(`/accounts/${encodeURIComponent(id)}/sync`,token,"duckmail",{method:"POST"})}
+export async function downloadHostedFile(token:string,url:string,filename:string){
+  if(!/^\/messages\/[^/]+\/(source|attachments\/[^/]+)$/.test(url))throw new Error("无效下载路径")
+  const response=await authorizedRequest(url,token,"duckmail")
+  const blob=await response.blob();const local=URL.createObjectURL(blob);const a=document.createElement("a");a.href=local;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(local),1000)
 }
