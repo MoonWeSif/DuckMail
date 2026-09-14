@@ -1,0 +1,9 @@
+services:
+  duckmail-web:
+    image: syferie/duckmail-web:latest
+    container_name: duckmail-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
