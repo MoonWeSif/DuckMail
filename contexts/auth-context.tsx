@@ -15,6 +15,7 @@ import {
   deleteAccount as deleteAccountApi,
 } from "@/lib/api";
 import { exchangeHostedToken, hasHostingKey } from "@/lib/hosting-api";
+import { requestHostedRelogin } from "@/lib/hosting-session";
 interface AuthContextType extends AuthState {
   /** True once persisted accounts have been read from localStorage. */
   isReady: boolean;
@@ -51,10 +52,8 @@ function providerFor(address: string) {
     return "duckmail";
   }
 }
-function safeAccount(a: Account): Account {
-  return a.source === "microsoft"
-    ? { ...a, password: undefined, providerId: "duckmail" }
-    : a;
+function persistAccount(a: Account): Account {
+  return a.source === "microsoft" ? { ...a, providerId: "duckmail" } : a;
 }
 function same(a: Account, b: Account) {
   return (
@@ -74,9 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(data.accounts))
           setState({
             ...data,
-            accounts: data.accounts.map(safeAccount),
+            accounts: data.accounts.map(persistAccount),
             currentAccount: data.currentAccount
-              ? safeAccount(data.currentAccount)
+              ? persistAccount(data.currentAccount)
               : null,
           });
       }
@@ -92,9 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "auth",
         JSON.stringify({
           ...state,
-          accounts: state.accounts.map(safeAccount),
+          accounts: state.accounts.map(persistAccount),
           currentAccount: state.currentAccount
-            ? safeAccount(state.currentAccount)
+            ? persistAccount(state.currentAccount)
             : null,
         }),
       );
@@ -118,11 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("token-refreshed", refreshed);
   }, []);
   const apply = (a: Account, token: string, password?: string) => {
-    const account = safeAccount({
+    const account = persistAccount({
       ...a,
       lastAccessedAt: Date.now(),
       token,
-      password,
+      password: password ?? a.password,
       providerId:
         a.source === "microsoft"
           ? "duckmail"
@@ -175,11 +174,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         account.loginMethod === "apiKey" &&
         hasHostingKey()
       ) {
-        token = (await exchangeHostedToken(account.id)).token;
-      } else if (account.source !== "microsoft" && account.password) {
+        token = (await exchangeHostedToken(account.address)).token;
+      } else if (account.password) {
         token = (await getToken(account.address, account.password, providerId))
           .token;
-      } else throw new Error("登录已过期，请重新输入访问密码或连接 API Key");
+      } else {
+        if (account.source === "microsoft") requestHostedRelogin(account.address);
+        throw new Error("登录已过期，请重新输入访问密码或连接 API Key");
+      }
       loaded = await getAccount(token, providerId);
     }
     if (

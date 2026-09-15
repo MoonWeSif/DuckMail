@@ -244,8 +244,13 @@ export default function MessageDetail({ message, onBack, onDelete }: MessageDeta
             onPress={handleDelete}
             isDisabled={currentAccount?.capabilities?.hideMessagesLocally === false}
             size={isMobile ? "sm" : "md"}
+            title={currentAccount?.source === "microsoft" ? t("hideLocallyDesc") : undefined}
           >
-            {currentAccount?.source === "microsoft" ? "从 DuckMail 隐藏" : isMobile ? t("deleteMobile") : t("delete")}
+            {currentAccount?.source === "microsoft"
+              ? t("hideLocally")
+              : isMobile
+                ? t("deleteMobile")
+                : t("delete")}
           </Button>
           {messageDetail.downloadUrl && (
             <Button

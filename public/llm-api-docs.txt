@@ -11,8 +11,10 @@
 Obtain a token via POST /token with email address and password.
 Include in requests: Authorization: Bearer <token>
 
-### API Key (Optional)
-For private domain access. Obtain from https://domain.duckmail.sbs
+### API Key
+Required for Microsoft hosted mailbox list/import/management.
+Optional for GET /domains and POST /accounts; required when using a private domain.
+Obtain from https://domain.duckmail.sbs
 Format: dk_ prefix. Include in requests: Authorization: Bearer dk_xxx
 
 ---
@@ -58,7 +60,8 @@ Request:
 Fields:
 - address (required): email address. Username (before @) >= 3 chars, domain must be verified.
 - password (required): >= 6 chars.
-- expiresIn (optional, integer, seconds): Account expiry. Omit = 24h auto-cleanup. 0 or -1 = never expires. Positive number = custom expiry in seconds.
+- expiresIn (optional, integer, seconds): Account expiry. Omit = 24h auto-cleanup. Positive number = custom expiry in seconds. 0 or -1 = never expires.
+  Note: only pass 0/-1 when you truly need a long-lived mailbox. For throwaway/verification-code usage, omit it or use a short expiry so the account is cleaned up automatically.
 Validation: address must contain @, username (before @) >= 3 chars, password >= 6 chars, domain must be verified.
 Response (201):
 {
@@ -204,10 +207,10 @@ Status codes:
 
 ## Quick Start Example
 
-# 1. Create account (expiresIn: omit=24h, 0/-1=never, >0=custom seconds)
+# 1. Create account (expiresIn: omit=24h, >0=custom seconds; 0/-1=never, only if you really need it)
 curl -X POST https://api.duckmail.sbs/accounts \
   -H "Content-Type: application/json" \
-  -d '{"address": "test@duckmail.sbs", "password": "mypassword", "expiresIn": 0}'
+  -d '{"address": "test@duckmail.sbs", "password": "mypassword", "expiresIn": 86400}'
 
 # 2. Get token
 curl -X POST https://api.duckmail.sbs/token \
@@ -233,25 +236,26 @@ curl https://api.duckmail.sbs/domains \
 
 ## Microsoft Hosted Accounts
 
-Hosted mailboxes use the same POST /token {address,password} and account Bearer token message APIs. password is an independent DuckMail access password, NOT the actual Microsoft password.
+Hosted mailboxes use the same /accounts, /token, /me and /messages APIs as temporary mailboxes. password is an independent DuckMail access password, NOT the actual Microsoft password.
 
-POST /accounts with source="microsoft" and connection={protocol:"auto"|"graph"|"imap",refreshToken,clientId} imports one account; POST /accounts/imports {entries:[...]} imports up to 500. Both require an owner session or API Key and return HTTP 202 {importId,statusUrl}. Poll GET /accounts/imports/{importId}. SMTP account creation remains HTTP 201.
+Public hosted management requires an API Key. Panel owner sessions may call the same paths.
 
-Management endpoints (owner or their API Key):
-GET /accounts?page=1&q=&status= — hosted accounts only, Hydra pagination.
+POST /accounts/imports {entries:[...]} imports up to 500. Nested connection remains accepted. Returns HTTP 202 {importId,statusUrl}. Poll GET /accounts/imports/{importId}.
+
+Management endpoints (API Key required):
+GET /accounts/hosted?page=1&q=&status= — hosted accounts only, Hydra pagination, 30 per page.
 GET /accounts/{id}/connection — connection status/clientId, never refreshToken.
 PATCH /accounts/{id} {label?,tags?,paused?,status?:"active"|"disabled"}.
 POST /accounts/{id}/password {password} — resets DuckMail password and invalidates old account tokens.
 POST /accounts/{id}/connection {protocol,clientId,refreshToken} — verifies replacement authorization asynchronously; does not change password or account ID.
-POST /accounts/{id}/token — exchanges the owner's API Key for a token for this mailbox.
-POST /accounts/{id}/sync — schedules bounded/coalesced sync, HTTP 202.
+POST /accounts/{id}/sync — mailbox token or owner schedules a sync, HTTP 202.
 DELETE /accounts/{id} — owner-only removal of hosted account, credentials and cache; never deletes Microsoft mail.
 POST /accounts/imports/{importId}/retry or /cancel — recover transient failures or cancel pending rows.
 
-POST /token stays {address,password} -> {id,token}, without Microsoft credentials or API Key. Hosted account token lifetime is 24h. GET /me adds source, hosting, capabilities.
-GET /messages supports folder=inbox|junk|all, from, subject, receivedAfter (RFC3339), seen=true|false; defaults to inbox, 30 items/page, recent 7 days. Hydra count is local synchronized count, not the remote mailbox total. Check sync.initialSyncComplete, stale, truncated, and lastSuccessAt before interpreting an empty list.
+POST /token with API Key and {"address":"..."} (no password) -> {id,token} for that hosted mailbox. Then call /me and /messages with the token. Password login via POST /token still works the same as temporary mail. Hosted account token lifetime is 24h. GET /me adds source, hosting, capabilities.
+GET /messages?page=1 returns all synced mail for that account (inbox and junk), 30 items/page, recent 7 days. Optional folder=inbox|junk, from, subject, receivedAfter (RFC3339), seen=true|false. Hydra count is local synchronized count, not the remote mailbox total. Check sync.initialSyncComplete, stale, truncated, and lastSuccessAt before interpreting an empty list.
 GET /messages/{id}/source downloads MIME; GET /messages/{id}/attachments/{attachmentId} downloads attachments. Both require account Bearer token. Maximum source size is 25 MiB.
-PATCH /messages/{id} and DELETE /messages/{id} affect only local seen/hidden state. A read-only Key cannot perform either operation.
+PATCH /messages/{id} and DELETE /messages/{id} affect only local seen/hidden state.
 
 One API Key accesses all private domains and hosted mailboxes owned by its user, including local seen/hide and management. No per-key permissions or mailbox selection. Existing domain Keys work directly. Revoking a Key invalidates its derived account tokens, not independent password sessions.
 

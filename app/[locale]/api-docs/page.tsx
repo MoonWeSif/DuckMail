@@ -40,6 +40,7 @@ const ApiEndpointCard = ({ endpoint, t }: { endpoint: any; t: any }) => {
     switch (method) {
       case "GET": return "primary"
       case "POST": return "success"
+      case "PATCH": return "warning"
       case "DELETE": return "danger"
       default: return "default"
     }
@@ -58,6 +59,9 @@ const ApiEndpointCard = ({ endpoint, t }: { endpoint: any; t: any }) => {
 
     const headers: any = { "Content-Type": "application/json" }
     if (endpoint.authType === "optional-apikey" && apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`
+    }
+    if (endpoint.authType === "required-apikey" && apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`
     }
     if (endpoint.authType === "required-token" && token) {
@@ -93,14 +97,20 @@ const ApiEndpointCard = ({ endpoint, t }: { endpoint: any; t: any }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col gap-4">
-            {(endpoint.authType === "optional-apikey" || endpoint.authType === "required-token") && (
+            {(endpoint.authType === "optional-apikey" || endpoint.authType === "required-apikey" || endpoint.authType === "required-token") && (
               <div>
                 <h4 className="font-semibold mb-2">{t("authorization")}</h4>
                 <Input
-                  label={endpoint.authType === "optional-apikey" ? `${t("apiKey")} (dk_...)` : t("bearerToken")}
-                  placeholder={endpoint.authType === "optional-apikey" ? "Enter your API Key (optional)" : "Enter your Bearer Token"}
-                  value={endpoint.authType === "optional-apikey" ? apiKey : token}
-                  onChange={(e) => endpoint.authType === "optional-apikey" ? setApiKey(e.target.value) : setToken(e.target.value)}
+                  label={endpoint.authType === "required-token" ? t("bearerToken") : `${t("apiKey")} (dk_...)`}
+                  placeholder={
+                    endpoint.authType === "required-token"
+                      ? "Enter your Bearer Token"
+                      : endpoint.authType === "required-apikey"
+                        ? "Enter your API Key"
+                        : "Enter your API Key (optional)"
+                  }
+                  value={endpoint.authType === "required-token" ? token : apiKey}
+                  onChange={(e) => endpoint.authType === "required-token" ? setToken(e.target.value) : setApiKey(e.target.value)}
                 />
               </div>
             )}
@@ -176,16 +186,6 @@ export default function ApiDocsPage() {
   // API 端点数据（使用翻译 key）
   const apiEndpoints = [
     {
-      group: "Microsoft 托管",
-      endpoints: [
-        {method:"GET",path:"/accounts",description:"使用同一个 API Key 列出全部自有托管账号。",authType:"optional-apikey"},
-        {method:"POST",path:"/accounts/imports",description:"批量导入，password 为独立 DuckMail 访问密码。使用本人的 API Key；返回 202 后查询导入结果。",authType:"optional-apikey",body:JSON.stringify({entries:[{source:"microsoft",address:"example@outlook.com",password:"<独立DuckMail访问密码>",connection:{protocol:"auto",clientId:"<原应用client_id>",refreshToken:"<refresh_token>"},tags:[]}]},null,2)},
-        {method:"GET",path:"/accounts/imports/{importId}",description:"逐行查看验证和创建结果。不会返回 Microsoft 授权或密码。",authType:"optional-apikey",pathParams:[{name:"importId",value:""}]},
-        {method:"POST",path:"/accounts/{id}/token",description:"用 account:access Key 取得单账号 token，然后继续调用现有 /me、/messages。",authType:"optional-apikey",pathParams:[{name:"id",value:""}]},
-        {method:"GET",path:"/messages?folder=junk",description:"用账号 token 查看垃圾邮件。检查响应 sync 状态；本地缓存不等于完整远端邮箱。",authType:"required-token"},
-      ],
-    },
-    {
       group: t("domainGroup"),
       endpoints: [
         { method: "GET", path: "/domains", description: t("domainGetDesc"), authType: "optional-apikey" },
@@ -196,7 +196,7 @@ export default function ApiDocsPage() {
       endpoints: [
         {
           method: "POST", path: "/accounts", description: t("accountCreateDesc"), authType: "optional-apikey",
-          body: `{\n  "address": "user@duckmail.sbs",\n  "password": "your_password",\n  "expiresIn": 0\n}`,
+          body: `{\n  "address": "user@duckmail.sbs",\n  "password": "your_password",\n  "expiresIn": 86400\n}`,
         },
         { method: "GET", path: "/me", description: t("accountMeDesc"), authType: "required-token" },
         { method: "DELETE", path: "/accounts/{id}", description: t("accountDeleteDesc"), authType: "required-token", pathParams: [{ name: "id", value: "" }] },
@@ -217,6 +217,18 @@ export default function ApiDocsPage() {
         { method: "GET", path: "/messages", description: t("messageListDesc"), authType: "required-token" },
         { method: "GET", path: "/messages/{id}", description: t("messageGetDesc"), authType: "required-token", pathParams: [{ name: "id", value: "" }] },
         { method: "DELETE", path: "/messages/{id}", description: t("messageDeleteDesc"), authType: "required-token", pathParams: [{ name: "id", value: "" }] },
+      ],
+    },
+    {
+      group: t("hostedGroup"),
+      endpoints: [
+        { method: "GET", path: "/accounts/hosted", description: t("hostedListDesc"), authType: "required-apikey" },
+        { method: "POST", path: "/token", description: t("hostedTokenDesc"), authType: "required-apikey", body: JSON.stringify({ address: "example@outlook.com" }, null, 2) },
+        { method: "POST", path: "/accounts/imports", description: t("hostedImportDesc"), authType: "required-apikey", body: JSON.stringify({ entries: [{ address: "example@outlook.com", password: "<独立DuckMail访问密码>", refreshToken: "<refresh_token>", clientId: "<原应用client_id>" }] }, null, 2) },
+        { method: "GET", path: "/accounts/imports/{importId}", description: t("hostedImportGetDesc"), authType: "required-apikey", pathParams: [{ name: "importId", value: "" }] },
+        { method: "PATCH", path: "/accounts/{id}", description: t("hostedPatchDesc"), authType: "required-apikey", pathParams: [{ name: "id", value: "" }], body: JSON.stringify({ label: "", paused: false, status: "active" }, null, 2) },
+        { method: "DELETE", path: "/accounts/{id}", description: t("hostedDeleteDesc"), authType: "required-apikey", pathParams: [{ name: "id", value: "" }] },
+        { method: "POST", path: "/accounts/{id}/sync", description: t("hostedOwnerSyncDesc"), authType: "required-apikey", pathParams: [{ name: "id", value: "" }] },
       ],
     },
   ]

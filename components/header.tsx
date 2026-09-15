@@ -338,7 +338,7 @@ export default function Header({
                       </div>
                     </DropdownItem>
 
-                    {!hosted && currentAccount.password ? (
+                    {currentAccount.password ? (
                       <DropdownItem
                         key="password"
                         isReadOnly

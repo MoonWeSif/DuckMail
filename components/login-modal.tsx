@@ -189,7 +189,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress }: LoginMod
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                DuckMail 访问密码
+                {t("passwordLabel")}
               </label>
               <Input
                 type={isPasswordVisible ? "text" : "password"}
@@ -214,7 +214,7 @@ export default function LoginModal({ isOpen, onClose, accountAddress }: LoginMod
                   <AlertCircle size={16} className="text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
                     <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">{t("importantNotice")}</p>
-                    <p className="text-yellow-700 dark:text-yellow-300">托管邮箱请使用在 DuckMail 设置的独立访问密码。忘记后由所有者在管理面板重设；临时邮箱仍不支持找回。</p>
+                    <p className="text-yellow-700 dark:text-yellow-300">{t("hostedPasswordHint")}</p>
                   </div>
                 </div>
               </CardBody>

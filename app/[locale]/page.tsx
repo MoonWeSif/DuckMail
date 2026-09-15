@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { useApiProvider } from "@/contexts/api-provider-context"
 import { MailStatusProvider } from "@/contexts/mail-status-context"
 import type { Message } from "@/types"
+import { HOSTED_AUTH_REQUIRED } from "@/lib/hosting-session"
 import { useHeroUIToast } from "@/hooks/use-heroui-toast"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useTranslations, useLocale } from "next-intl"
@@ -81,6 +82,16 @@ function MainContent() {
       }, 500)
       return () => clearTimeout(timer)
     }
+  }, [])
+
+  useEffect(() => {
+    const onNeed = (event: Event) => {
+      const address = (event as CustomEvent<{ address?: string }>).detail?.address || ""
+      setLoginAccountAddress(address)
+      setIsLoginModalOpen(true)
+    }
+    window.addEventListener(HOSTED_AUTH_REQUIRED, onNeed)
+    return () => window.removeEventListener(HOSTED_AUTH_REQUIRED, onNeed)
   }, [])
 
   // 一键创建临时邮箱（首次进入自动触发，或用户手动触发）
@@ -172,6 +183,7 @@ function MainContent() {
   }
 
   const handleLogin = () => {
+    setLoginAccountAddress("")
     setIsLoginModalOpen(true)
   }
 
@@ -323,6 +335,13 @@ function MainContent() {
             ) : !authReady || !providerReady || isCreatingAccount ? (
               // 本地状态尚未恢复 / 正在自动创建：用同一个轻量动画占位，避免落地页闪烁
               <CreatingState />
+            ) : apiKey ? (
+              <EmptyState
+                mode="hosted"
+                onCreateAccount={handleQuickCreate}
+                isAuthenticated={isAuthenticated}
+                isCreating={isCreatingAccount}
+              />
             ) : (
               // 自动创建失败或用户删光了邮箱：保留手动入口，并继续展示系统说明
               <div className="flex flex-col">

@@ -4,10 +4,18 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Mail, RefreshCw } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/auth-context";
 import { useMailStatus } from "@/contexts/mail-status-context";
 import { getHostedMessagePage, syncHostedAccount } from "@/lib/api";
 import type { HostingStatus, Message } from "@/types";
+
+function httpStatus(e: unknown) {
+  const match =
+    e instanceof Error ? e.message.match(/^HTTP (\d+)/) : null;
+  return match ? Number(match[1]) : 0;
+}
+
 export default function HostedMessageList({
   onSelectMessage,
   refreshKey,
@@ -15,10 +23,10 @@ export default function HostedMessageList({
   onSelectMessage: (m: Message) => void;
   refreshKey: number;
 }) {
+  const t = useTranslations("hostedInbox");
   const { isEnabled } = useMailStatus();
   const { token, currentAccount } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]),
-    [folder, setFolder] = useState("inbox"),
     [page, setPage] = useState(1),
     [total, setTotal] = useState(0),
     [sync, setSync] = useState<HostingStatus | undefined>(
@@ -37,8 +45,15 @@ export default function HostedMessageList({
       const seq = ++sequence.current;
       setBusy(true);
       try {
-        if (manual) await syncHostedAccount(token, currentAccount.id);
-        const data = await getHostedMessagePage(token, page, folder, filters);
+        if (manual) {
+          try {
+            await syncHostedAccount(token, currentAccount.id);
+          } catch (e) {
+            const status = httpStatus(e);
+            if (status !== 409 && status !== 424) throw e;
+          }
+        }
+        const data = await getHostedMessagePage(token, page, filters);
         if (seq !== sequence.current) return;
         setMessages(data.messages);
         setTotal(data.total);
@@ -46,47 +61,60 @@ export default function HostedMessageList({
         setError("");
       } catch (e) {
         if (seq === sequence.current)
-          setError(e instanceof Error ? e.message : "获取邮件失败");
+          setError(e instanceof Error ? e.message : t("loadFailed"));
       } finally {
         if (seq === sequence.current) setBusy(false);
       }
     },
-    [token, currentAccount?.id, page, folder, filters],
+    [token, currentAccount?.id, page, filters, t],
   );
   useEffect(() => {
     load();
-    const t = isEnabled
+    const timer = isEnabled
       ? setInterval(() => {
           if (!document.hidden) load();
-        }, 15000)
+        }, 3000)
       : undefined;
     return () => {
-      if (t) clearInterval(t);
+      if (timer) clearInterval(timer);
       sequence.current++;
     };
   }, [load, isEnabled]);
   useEffect(() => {
+    if (
+      !isEnabled ||
+      sync?.paused ||
+      sync?.status === "needs_reauth" ||
+      sync?.initialSyncComplete
+    )
+      return;
+    const timer = setTimeout(() => load(), 1500);
+    return () => clearTimeout(timer);
+  }, [isEnabled, load, sync?.paused, sync?.status, sync?.initialSyncComplete]);
+  useEffect(() => {
     if (refreshKey) load(true);
   }, [refreshKey]);
   const warning = sync?.paused
-    ? "同步已暂停，当前显示已缓存邮件。"
+    ? t("paused")
     : sync?.status === "needs_reauth"
-      ? "Microsoft 授权需要更新。DuckMail 仍可登录，当前只能显示已缓存邮件。"
+      ? t("needsReauth")
       : !sync?.initialSyncComplete
-        ? "首次同步尚未完成，当前结果不代表微软邮箱为空。"
+        ? t("indexing")
         : sync?.stale
-          ? "同步结果可能不是最新，正在等待下一轮同步。"
+          ? t("stale")
           : "";
   return (
     <div className="h-full overflow-y-auto bg-white p-4 text-gray-800 dark:bg-gray-900 dark:text-gray-100 md:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold">收件箱</h2>
+          <h2 className="text-2xl font-semibold">{t("inbox")}</h2>
           <p className="mt-1 text-xs text-default-500">
-            Microsoft 托管 ·{" "}
+            {t("hosted")} ·{" "}
             {sync?.lastSuccessAt
-              ? `最近同步 ${new Date(sync.lastSuccessAt).toLocaleString()}`
-              : "尚未完成首次同步"}
+              ? t("lastSync", {
+                  time: new Date(sync.lastSuccessAt).toLocaleString(),
+                })
+              : t("notSynced")}
           </p>
         </div>
         <Button
@@ -95,7 +123,7 @@ export default function HostedMessageList({
           onPress={() => load(true)}
           startContent={!busy ? <RefreshCw size={16} /> : undefined}
         >
-          刷新
+          {t("refresh")}
         </Button>
       </div>
       {warning && (
@@ -110,9 +138,7 @@ export default function HostedMessageList({
         </p>
       )}
       {sync?.truncated && (
-        <p className="mb-3 text-sm text-amber-700">
-          同步结果已达窗口上限，列表不是完整远端邮箱。
-        </p>
+        <p className="mb-3 text-sm text-amber-700">{t("truncated")}</p>
       )}
       {error && (
         <p
@@ -122,49 +148,35 @@ export default function HostedMessageList({
           {error}
         </p>
       )}
-      <div className="mb-4 flex gap-2">
-        {[
-          ["inbox", "收件箱"],
-          ["junk", "垃圾邮件"],
-          ["all", "全部已同步文件夹"],
-        ].map(([id, label]) => (
-          <Button
-            key={id}
-            size="sm"
-            variant={folder === id ? "flat" : "light"}
-            color={folder === id ? "primary" : "default"}
-            onPress={() => {
-              setFolder(id);
-              setPage(1);
-            }}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
       <details className="mb-4 rounded-lg border border-default-200 p-3 text-sm">
-        <summary className="cursor-pointer">筛选近期邮件</summary>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <summary className="cursor-pointer">{t("filter")}</summary>
+        <div className="mt-3 grid items-end gap-3 sm:grid-cols-2">
           <Input
             size="sm"
-            label="发件人"
+            labelPlacement="outside"
+            label={t("from")}
+            placeholder={t("fromPlaceholder")}
             value={from}
             onChange={(e) => setFrom(e.target.value)}
           />
           <Input
             size="sm"
-            label="主题"
+            labelPlacement="outside"
+            label={t("subject")}
+            placeholder={t("subjectPlaceholder")}
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
           />
           <Input
             size="sm"
-            label="接收时间之后"
+            labelPlacement="outside"
+            label={t("after")}
+            placeholder=" "
             type="datetime-local"
             value={after}
             onChange={(e) => setAfter(e.target.value)}
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <Button
               size="sm"
               color="primary"
@@ -177,7 +189,7 @@ export default function HostedMessageList({
                 setPage(1);
               }}
             >
-              应用筛选
+              {t("applyFilter")}
             </Button>
             <Button
               size="sm"
@@ -190,7 +202,7 @@ export default function HostedMessageList({
                 setPage(1);
               }}
             >
-              清除
+              {t("clearFilter")}
             </Button>
           </div>
         </div>
@@ -204,10 +216,10 @@ export default function HostedMessageList({
           <Mail className="mx-auto mb-3 h-8 w-8" />
           <p>
             {!sync?.initialSyncComplete
-              ? "正在建立邮件索引"
+              ? t("indexingEmpty")
               : sync?.stale
-                ? "当前暂无缓存结果，无法确认是否有新邮件"
-                : "当前同步范围内没有匹配邮件"}
+                ? t("staleEmpty")
+                : t("noMatch")}
           </p>
         </div>
       ) : (
@@ -227,7 +239,7 @@ export default function HostedMessageList({
                 {!m.seen && (
                   <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
                 )}
-                {m.subject || "无主题"}
+                {m.subject || t("noSubject")}
               </p>
               <p className="mt-1 truncate text-xs text-default-500">
                 {m.intro}
@@ -237,21 +249,21 @@ export default function HostedMessageList({
         </div>
       )}
       <div className="mt-4 flex items-center justify-between gap-2 text-xs text-default-500">
-        <span>已同步范围内共 {total} 封</span>
+        <span>{t("rangeTotal", { total })}</span>
         <div className="flex gap-2">
           <Button
             size="sm"
             isDisabled={page === 1}
             onPress={() => setPage((p) => p - 1)}
           >
-            上一页
+            {t("prevPage")}
           </Button>
           <Button
             size="sm"
             isDisabled={page * 30 >= total}
             onPress={() => setPage((p) => p + 1)}
           >
-            下一页
+            {t("nextPage")}
           </Button>
         </div>
       </div>

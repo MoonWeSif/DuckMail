@@ -324,9 +324,8 @@ const refreshTokenPromises = new Map<string, Promise<string | null>>()
 
 // 尝试刷新 *指定账户* 的 token（在收到401时调用）
 async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string | null> {
-  if(account.source === "microsoft") {
-    if(account.loginMethod !== "apiKey") return null
-    try { const {exchangeHostedToken}=await import("./hosting-api");const {token}=await exchangeHostedToken(account.id);updateTokenInStorage(account.address,token);return token } catch {return null}
+  if(account.source === "microsoft" && account.loginMethod === "apiKey") {
+    try { const {exchangeHostedToken}=await import("./hosting-api");const {token}=await exchangeHostedToken(account.address);updateTokenInStorage(account.address,token);return token } catch {return null}
   }
 
   const inflight = refreshTokenPromises.get(account.address)
@@ -334,7 +333,12 @@ async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string |
     return inflight
   }
 
-  if (!account.password) {
+  let password = account.password
+  if (!password) {
+    if (account.source === "microsoft") {
+      const { requestHostedRelogin } = await import("./hosting-session")
+      requestHostedRelogin(account.address)
+    }
     return null
   }
 
@@ -348,7 +352,7 @@ async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string |
       const res = await fetch(buildProxyUrl('/token'), {
         method: "POST",
         headers,
-        body: JSON.stringify({ address: account.address, password: account.password }),
+        body: JSON.stringify({ address: account.address, password }),
       })
 
       if (!res.ok) {
@@ -678,8 +682,8 @@ export async function deleteAccount(token: string, id: string, providerId?: stri
   await authorizedRequest(`/accounts/${id}`, token, providerId, { method: "DELETE" })
 }
 
-export async function getHostedMessagePage(token:string,page=1,folder="inbox",filters:Record<string,string>={}) {
-  const query=new URLSearchParams({page:String(page),folder,...Object.fromEntries(Object.entries(filters).filter(([,v])=>v))})
+export async function getHostedMessagePage(token:string,page=1,filters:Record<string,string>={}) {
+  const query=new URLSearchParams({page:String(page),...Object.fromEntries(Object.entries(filters).filter(([,v])=>v))})
   const res=await authorizedRequest(`/messages?${query}`,token,"duckmail")
   const data=await res.json()
   return {messages:(data["hydra:member"]||[]) as Message[],total:data["hydra:totalItems"]||0,sync:data.sync as import("@/types").HostingStatus}

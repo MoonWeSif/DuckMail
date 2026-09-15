@@ -32,22 +32,21 @@ export function listHostedAccounts(
   signal?: AbortSignal,
 ) {
   return request<{ "hydra:member": Account[]; "hydra:totalItems": number }>(
-    `/accounts?${new URLSearchParams({ page: String(page), q, status })}`,
+    `/accounts/hosted?${new URLSearchParams({ page: String(page), q, status })}`,
     { signal },
   );
 }
-export async function exchangeHostedToken(id: string) {
-  return request<{ id: string; token: string }>(
-    `/accounts/${encodeURIComponent(id)}/token`,
-    { method: "POST" },
-  );
+export async function exchangeHostedToken(address: string) {
+  return request<{ id: string; token: string }>("/token", {
+    method: "POST",
+    body: JSON.stringify({ address }),
+  });
 }
 export async function hostedMessages(
   token: string,
   page: number,
-  folder: string,
   filters: Record<string, string> = {},
 ) {
   const { getHostedMessagePage } = await import("./api");
-  return getHostedMessagePage(token, page, folder, filters);
+  return getHostedMessagePage(token, page, filters);
 }
