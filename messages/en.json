@@ -452,7 +452,7 @@
     "messageDeleteDesc": "Delete an SMTP temporary message. For hosted mailboxes, only hide the local record; the original Microsoft message is not deleted.",
     "hostedGroup": "Microsoft Hosting",
     "hostedListDesc": "List hosted accounts you own, 30 per page, same Hydra pagination as GET /domains. API Key required.",
-    "hostedImportDesc": "Import up to 500 hosted mailboxes per batch with an API Key. password is an independent DuckMail access password of 8–72 bytes, not the Microsoft password. protocol defaults to auto: try Graph first and fall back to IMAP only for an explicit protocol-permission failure. Explicit graph/imap uses only that protocol. A 202 response contains importId/statusUrl; poll for results, since acceptance does not mean all accounts succeeded.",
+    "hostedImportDesc": "Import up to 500 hosted mailboxes per batch with an API Key. password is an independent DuckMail access password of at least 8 characters and at most 72 UTF-8 bytes, not the Microsoft password. protocol defaults to auto: try Graph first and fall back to IMAP only for an explicit protocol-permission failure. Explicit graph/imap uses only that protocol. A 202 response contains importId/statusUrl; poll for results, since acceptance does not mean all accounts succeeded.",
     "hostedImportGetDesc": "Inspect per-row verification and creation results. Poll every 2 seconds, stop when complete, and honor Retry-After on 429. Microsoft credentials and passwords are never returned. API Key required.",
     "hostedPatchDesc": "Update a hosted account label, pause sync, or enable/disable it. API Key required.",
     "hostedDeleteDesc": "Remove hosting, credentials, and cache. Does not delete Microsoft mail. API Key required.",

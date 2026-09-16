@@ -452,7 +452,7 @@
     "messageDeleteDesc": "删除 SMTP 临时邮件；对托管邮箱只隐藏本地记录，不会删除 Microsoft 原信。",
     "hostedGroup": "Microsoft 托管",
     "hostedListDesc": "分页列出名下托管账号，每页 30 个，用法与 GET /domains 相同。必须携带 API Key。",
-    "hostedImportDesc": "每批最多导入 500 个托管邮箱，须携带 API Key。password 是独立 DuckMail 访问密码，须为 8–72 字节，不是 Microsoft 密码。protocol 默认 auto：优先 Graph，仅在明确缺少协议权限时回退 IMAP；手动选择 graph/imap 时仅使用指定协议。返回 202 和 importId/statusUrl 后查询任务结果，202 不代表所有账号已导入成功。",
+    "hostedImportDesc": "每批最多导入 500 个托管邮箱，须携带 API Key。password 是独立 DuckMail 访问密码，至少 8 个字符、最多 72 个 UTF-8 字节，不是 Microsoft 密码。protocol 默认 auto：优先 Graph，仅在明确缺少协议权限时回退 IMAP；手动选择 graph/imap 时仅使用指定协议。返回 202 和 importId/statusUrl 后查询任务结果，202 不代表所有账号已导入成功。",
     "hostedImportGetDesc": "逐行查看验证和创建结果；建议每 2 秒查询一次，任务完成后停止，遇到 429 按 Retry-After 等待。不会返回 Microsoft 授权或密码。必须携带 API Key。",
     "hostedPatchDesc": "更新托管账号的标签、暂停同步或启用/禁用。必须携带 API Key。",
     "hostedDeleteDesc": "解除托管并清除授权和缓存，不会删除 Microsoft 原信。必须携带 API Key。",

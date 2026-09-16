@@ -2,6 +2,9 @@
 # Base URL: https://api.duckmail.sbs
 # Authentication: Bearer Token or API Key (dk_xxx)
 # This file is designed to be sent to AI assistants for integration help.
+# All paths are relative to the Base URL. Send JSON request bodies with Content-Type: application/json.
+# IDs and credentials in examples are illustrative. Use values returned by the API; never send placeholders literally.
+# Response examples may omit additional fields or list items. A 204 response has no body: do not call response.json() on it.
 
 ---
 
@@ -19,19 +22,20 @@ Format: dk_ prefix. Include in requests: Authorization: Bearer dk_xxx
 
 ---
 
-## Endpoints
+## SMTP and Shared Mailbox Endpoints
 
 ### [Domains] GET /domains
 Get available domain list. Returns private domains if API key is provided.
 Auth: Optional (API Key or Bearer Token)
 Query: page (default 1, 30 per page)
 Response:
+```json
 {
   "hydra:member": [
     {
       "id": "string",
       "domain": "example.com",
-      "ownerId": "string | null",
+      "ownerId": null,
       "isVerified": true,
       "verificationToken": "duckmail-verify-xxx",
       "createdAt": "2024-01-01T00:00:00Z",
@@ -46,17 +50,20 @@ Response:
     "hydra:last": "/domains?page=1"
   }
 }
-Note: Only verified domains are returned. System domains (ownerId=null) are visible to all.
+```
+Note: Only verified domains are returned. System domains have ownerId omitted or null and are visible to all.
 
 ### [Accounts] POST /accounts
-Create a new email account. API key required for private domains.
+Create an SMTP temporary account. Use POST /accounts/imports for Microsoft hosting. API key required for private domains.
 Auth: Optional (API Key or Bearer Token)
 Request:
+```json
 {
   "address": "user@duckmail.sbs",
   "password": "your_password",
   "expiresIn": 86400
 }
+```
 Fields:
 - address (required): email address. Username (before @) >= 3 chars, domain must be verified.
 - password (required): >= 6 chars.
@@ -64,6 +71,7 @@ Fields:
   Note: only pass 0/-1 when you truly need a long-lived mailbox. For throwaway/verification-code usage, omit it or use a short expiry so the account is cleaned up automatically.
 Validation: address must contain @, username (before @) >= 3 chars, password >= 6 chars, domain must be verified.
 Response (201):
+```json
 {
   "id": "string",
   "address": "user@duckmail.sbs",
@@ -71,25 +79,31 @@ Response (201):
   "createdAt": "2024-01-01T00:00:00Z",
   "updatedAt": "2024-01-01T00:00:00Z"
 }
+```
 
 ### [Auth] POST /token
 Get authentication token using email and password.
-Auth: None
+Auth: None for password login. For hosted API-Key login, see Microsoft Hosted Mailboxes.
 Request:
+```json
 {
   "address": "user@duckmail.sbs",
   "password": "your_password"
 }
+```
 Response:
+```json
 {
   "id": "account-id",
   "token": "eyJhbGc..."
 }
+```
 
 ### [Accounts] GET /me
 Get current authenticated account info.
 Auth: Required (Bearer Token)
 Response:
+```json
 {
   "id": "string",
   "address": "user@duckmail.sbs",
@@ -97,9 +111,10 @@ Response:
   "createdAt": "2024-01-01T00:00:00Z",
   "updatedAt": "2024-01-01T00:00:00Z"
 }
+```
 
 ### [Accounts] DELETE /accounts/{id}
-Delete your own account by ID. You can only delete the currently logged-in account.
+SMTP accounts: delete the currently logged-in account by ID. Hosted account removal requires an owner API Key; see Microsoft Hosted Mailboxes.
 Auth: Required (Bearer Token)
 Response: 204 No Content
 
@@ -108,6 +123,7 @@ Get inbox message list (paginated, newest first).
 Auth: Required (Bearer Token)
 Query: page (default 1, 30 per page)
 Response:
+```json
 {
   "hydra:member": [
     {
@@ -127,14 +143,16 @@ Response:
     }
   ],
   "hydra:totalItems": 5,
-  "hydra:view": { ... }
+  "hydra:view": { "@id": "/messages", "@type": "PartialCollectionView", "hydra:first": "/messages?page=1", "hydra:last": "/messages?page=1" }
 }
+```
 Note: List view does not include text/html body content.
 
 ### [Messages] GET /messages/{id}
 Get full message details including body and attachments.
 Auth: Required (Bearer Token)
 Response:
+```json
 {
   "id": "string",
   "msgid": "string",
@@ -164,11 +182,15 @@ Response:
   "createdAt": "2024-01-01T00:00:00Z",
   "updatedAt": "2024-01-01T00:00:00Z"
 }
+```
 
 ### [Messages] PATCH /messages/{id}
 Mark a message as read.
 Auth: Required (Bearer Token)
-Response: { "seen": true }
+Response (200):
+```json
+{ "seen": true }
+```
 
 ### [Messages] DELETE /messages/{id}
 Delete a message by ID.
@@ -179,26 +201,31 @@ Response: 204 No Content
 Get raw email source (RFC 822 format).
 Auth: Required (Bearer Token)
 Response:
+```json
 {
   "id": "string",
   "downloadUrl": "/serve/mailbox/.../source",
   "data": "From: sender@example.com\nTo: ..."
 }
+```
 
 ---
 
 ## Error Response Format
 
+```json
 {
   "error": "Error Type",
   "message": "Detailed error message"
 }
+```
 
 Status codes:
 - 400: Bad Request (invalid format)
 - 401: Unauthorized (missing or invalid token)
 - 403: Forbidden (no permission)
 - 404: Not Found
+- 410: Gone (resource removed or upstream sync state expired)
 - 409: Conflict (e.g. an idempotency key reused with different import content)
 - 422: Unprocessable Entity (validation failed or an SMTP email address already exists)
 - 424: Microsoft authorization needs renewal (UPSTREAM_REAUTH_REQUIRED)
@@ -208,8 +235,9 @@ Status codes:
 
 ---
 
-## Quick Start Example
+## Quick Start: SMTP Temporary Mailbox
 
+```bash
 # 1. Create account (expiresIn: omit=24h, >0=custom seconds; 0/-1=never, only if you really need it)
 curl -X POST https://api.duckmail.sbs/accounts \
   -H "Content-Type: application/json" \
@@ -225,44 +253,338 @@ curl https://api.duckmail.sbs/messages \
   -H "Authorization: Bearer <your_token>"
 
 # 4. Get message detail
-curl https://api.duckmail.sbs/messages/<message_id> \
+curl "https://api.duckmail.sbs/messages/<message_id>" \
   -H "Authorization: Bearer <your_token>"
 
 # 5. Mark message as read
-curl -X PATCH https://api.duckmail.sbs/messages/<message_id> \
+curl -X PATCH "https://api.duckmail.sbs/messages/<message_id>" \
   -H "Authorization: Bearer <your_token>"
 
 # 6. Get domains (with API key for private domains)
 curl https://api.duckmail.sbs/domains \
   -H "Authorization: Bearer dk_your_api_key"
+```
 
+---
 
-## Microsoft Hosted Accounts
+## Microsoft Hosted Mailboxes
 
-Hosted mailboxes use /accounts/imports for creation, then /token, /me and /messages for mailbox access. POST /accounts creates SMTP temporary accounts only. password is an independent DuckMail access password, NOT the actual Microsoft password.
+### Scope and credentials
 
-Public hosted management requires an API Key. Panel owner sessions may call the same paths.
+- Use POST /accounts/imports to add a Microsoft mailbox. POST /accounts is for SMTP temporary accounts only.
+- An owner API Key manages that owner's hosted accounts. A mailbox token reads one mailbox. Send exactly one credential in the Authorization header.
+- A DuckMail access password is separate from the Microsoft password. Microsoft clientId/refreshToken are only used to establish or replace hosting authorization.
+- Existing domain API Keys also manage hosted accounts. There is no per-key mailbox selection. Owner panel sessions can also access management endpoints; examples below use API Keys for public integrations.
+- Revoking an API Key invalidates mailbox tokens issued through that key. Independent password-login tokens are not revoked by that action.
+- No endpoint sends email or deletes the original Microsoft message.
 
-POST /accounts/imports {entries:[...]} imports up to 500. Nested connection remains accepted. Returns HTTP 202 {importId,statusUrl}, which confirms queue acceptance, not successful import. Poll GET /accounts/imports/{importId} every 2 seconds until complete, honoring Retry-After on 429. Access passwords must be 8–72 bytes. protocol defaults to auto: Graph first, falling back to IMAP only for explicit protocol-permission failures. Explicit graph/imap uses only that protocol; throttling and network failures do not trigger protocol switching.
+### Recommended flow
 
-Management endpoints (API Key required):
-GET /accounts/hosted?page=1&q=&status= — hosted accounts only, Hydra pagination, 30 per page.
-GET /accounts/{id}/connection — connection status/clientId, never refreshToken.
-PATCH /accounts/{id} {label?,tags?,paused?,status?:"active"|"disabled"}.
-POST /accounts/{id}/password {password} — resets DuckMail password and invalidates old account tokens.
-POST /accounts/{id}/connection {protocol,clientId,refreshToken} — verifies replacement authorization asynchronously; does not change password or account ID.
-POST /accounts/{id}/sync — mailbox token or owner schedules a sync, HTTP 202.
-DELETE /accounts/{id} — owner-only removal of hosted account, credentials and cache; never deletes Microsoft mail.
-POST /accounts/imports/{importId}/retry or /cancel — recover transient failures or cancel pending rows.
+1. New mailbox: POST /accounts/imports, then poll its statusUrl until status is completed. Inspect each row; completed does not mean every row succeeded.
+2. Already imported: GET /accounts/hosted to find the account. Do not re-import it merely to sign in.
+3. POST /token with either the owner API Key and address, or the address and DuckMail access password.
+4. Use the returned mailbox token for GET /me, GET /messages and message detail/download endpoints.
+5. Poll without overlapping requests, normally every 2 seconds. Honor Retry-After on 429; a 2-second poll interval is not a Microsoft synchronization guarantee.
 
-POST /token with API Key and {"address":"..."} (no password) -> {id,token} for that hosted mailbox. Then call /me and /messages with the token. Password login via POST /token still works the same as temporary mail. Hosted account token lifetime is 24h. GET /me adds source, hosting, capabilities.
-GET /messages?page=1 returns all synced mail for that account (inbox and junk), 30 items/page, recent 7 days. Optional folder=inbox|junk, from, subject, receivedAfter (RFC3339), seen=true|false. Hydra count is local synchronized count, not the remote mailbox total. Check sync.initialSyncComplete, stale, truncated, and lastSuccessAt before interpreting an empty list.
-GET /messages/{id}/source downloads MIME; GET /messages/{id}/attachments/{attachmentId} downloads attachments. Both require account Bearer token. Maximum source size is 25 MiB.
-PATCH /messages/{id} and DELETE /messages/{id} affect only local seen/hidden state.
+### [Hosted Imports] POST /accounts/imports
+Create an asynchronous import job.
+Auth: Required (owner API Key)
+Headers: Content-Type: application/json; optional Idempotency-Key (up to 128 bytes).
+Request:
+```json
+{
+  "entries": [
+    {
+      "address": "example@outlook.com",
+      "password": "example-access-password",
+      "protocol": "auto",
+      "clientId": "11111111-2222-3333-4444-555555555555",
+      "refreshToken": "<MICROSOFT_REFRESH_TOKEN>",
+      "label": "Test mailbox",
+      "tags": ["testing"]
+    }
+  ]
+}
+```
+Fields:
+- entries (required): 1–500 entries per request; JSON body at most 5 MiB.
+- address (required): the Microsoft mailbox address; must match the authorized Microsoft identity.
+- password (required): independent DuckMail access password, at least 8 characters and at most 72 UTF-8 bytes. Import trims surrounding whitespace.
+- clientId (required): UUID of the original Microsoft application that issued the refresh token. Replace the example UUID with the real application ID.
+- refreshToken (required): that application's Microsoft refresh token, not a DuckMail mailbox token or Microsoft password.
+- protocol (optional): auto (default), graph or imap.
+- label (optional): up to 120 UTF-8 bytes. tags (optional): up to 10 strings, each up to 60 UTF-8 bytes.
+- source (optional): if supplied, must be microsoft. Omit expiresIn; hosted accounts do not use temporary-account expiry.
+- Compatibility: protocol/clientId/refreshToken may instead be nested in connection. Use either the flat form above or the nested form, not both.
+Protocol selection:
+- auto tries Graph first, then IMAP only when Graph explicitly lacks the required protocol permission.
+- Explicit graph or imap uses only that protocol. Throttling, network errors and invalid credentials do not cause automatic protocol switching.
+Response (202):
+```json
+{
+  "importId": "import-id",
+  "status": "queued",
+  "statusUrl": "/accounts/imports/import-id"
+}
+```
+Notes:
+- 202 means accepted for processing. Entry validation or Microsoft verification may still fail; inspect the job rows.
+- Each row has a 10-second processing deadline once claimed by a worker, including any retry and persistence; time waiting in the queue is separate. A timeout ends the row as failed with code IMPORT_TIMEOUT.
+- An actual Microsoft HTTP 500 is retried immediately once within that same deadline. A second failure, or any other error, ends the row as failed without automatic delayed retries. Other accounts continue processing.
+- Reusing an Idempotency-Key with the same request returns the original import ID. Different content with the same key returns 409 IDEMPOTENCY_CONFLICT.
+- A mailbox already owned by the same user is skipped without overwriting its password or authorization. An address unavailable to this owner fails.
+- Current owner quota: 5,000 hosted accounts plus pending new-account imports.
 
-One API Key accesses all private domains and hosted mailboxes owned by its user, including local seen/hide and management. No per-key permissions or mailbox selection. Existing domain Keys work directly. Revoking a Key invalidates its derived account tokens, not independent password sessions.
+### [Hosted Imports] GET /accounts/imports/{importId}
+Read job progress and per-entry results.
+Auth: Required (owner API Key)
+Path: importId from the import response, not an account ID.
+Response (200, example with one successful row):
+```json
+{
+  "id": "import-id",
+  "status": "completed",
+  "total": 1,
+  "counts": { "succeeded": 1 },
+  "createdAt": "2026-09-16T10:00:00Z",
+  "rows": [
+    {
+      "row": 1,
+      "address": "example@outlook.com",
+      "status": "succeeded",
+      "code": "",
+      "message": "",
+      "accountId": "account-id"
+    }
+  ]
+}
+```
+Status interpretation:
+- Job status is running while any row is queued/running; otherwise completed, including when rows failed or were cancelled.
+- Row status: queued, running, succeeded, skipped, failed or cancelled. row is a 1-based input index.
+- counts contains only statuses present in this job; treat missing counts as zero.
+- Use accountId from a succeeded row. A skipped existing account may also have accountId; a duplicate within the same batch can have an empty accountId.
+- For failed rows, inspect code/message. Credentials and passwords are never returned.
 
-Microsoft upstream authorization failure uses code UPSTREAM_REAUTH_REQUIRED (HTTP 424), not DuckMail 401. Refresh tokens are encrypted server-side, never returned. Same address has one DuckMail account; duplicate imports do not overwrite passwords. Graph import requires identity verification and Mail.Read permission; IMAP requires OAuth and enabled IMAP access. Imported confidential-client credentials requiring a secret are unsupported. No send-mail or remote delete is performed.
+### [Hosted Imports] POST /accounts/imports/{importId}/retry
+Requeue eligible failed rows in the same job.
+Auth: Required (owner API Key)
+Request: No body required.
+Response (202):
+```json
+{ "importId": "import-id" }
+```
+Notes: Only failed rows with retained retry data in a job less than 24 hours old are retried. Manual retries still wait for any recorded Microsoft Retry-After. This does not correct invalid credentials or recreate completed rows. If retry data has expired, submit corrected entries as a new import.
+
+### [Hosted Imports] POST /accounts/imports/{importId}/cancel
+Cancel unfinished rows and discard their pending credentials.
+Auth: Required (owner API Key)
+Request: No body required.
+Response: 204 No Content.
+Notes: Affects queued, running and failed rows; does not undo accounts already created. Poll the job to inspect final row results.
+
+### [Hosted Accounts] GET /accounts/hosted
+List hosted accounts owned by the API Key's user.
+Auth: Required (owner API Key)
+Query:
+- page: default 1; 30 accounts per page.
+- q: optional address/label/tag search, up to 200 UTF-8 bytes.
+- status: optional filter, such as active, disabled, paused, ready, syncing, retrying or needs_reauth.
+Response (200): Hydra collection with hydra:member, hydra:totalItems and hydra:view, as in GET /domains. Members have source=microsoft, account status, hosting and capabilities.
+Notes: Account status (active/disabled) and hosting.status (connection/sync state) are separate. Management views expose management capabilities; mailbox-token views do not.
+
+### [Hosted Auth] POST /token
+Obtain a 24-hour token for one hosted mailbox. Choose one login method.
+
+Method A — owner API Key, no password:
+Auth: Required (owner API Key)
+Request:
+```json
+{ "address": "example@outlook.com" }
+```
+Method B — independent DuckMail password:
+Auth: None
+Request:
+```json
+{ "address": "example@outlook.com", "password": "example-access-password" }
+```
+Response (200, both methods):
+```json
+{ "id": "account-id", "token": "<MAILBOX_TOKEN>" }
+```
+Notes: Reuse the mailbox token until it expires or is revoked; do not obtain a new token on every poll. Direct message-reading endpoints require this token, not the owner API Key.
+
+### [Hosted Accounts] GET /me
+Read the mailbox identity and current hosting state.
+Auth: Required (mailbox token)
+Response (200, selected fields):
+```json
+{
+  "id": "account-id",
+  "address": "example@outlook.com",
+  "authType": "email",
+  "source": "microsoft",
+  "status": "active",
+  "hosting": {
+    "status": "ready",
+    "protocol": "graph",
+    "paused": false,
+    "lastSuccessAt": "2026-09-16T10:05:00Z",
+    "nextSyncAt": null,
+    "initialSyncComplete": true,
+    "stale": false,
+    "truncated": false,
+    "coverageFrom": "2026-09-09T10:00:00Z",
+    "folders": ["inbox", "junk"]
+  },
+  "capabilities": {
+    "readMessages": true,
+    "markSeenLocally": true,
+    "hideMessagesLocally": true,
+    "deleteAccount": false,
+    "manageConnection": false
+  }
+}
+```
+Notes: hosting may also include errorCode/errorMessage. lastSuccessAt and nextSyncAt can be null. A Microsoft authorization problem does not by itself invalidate DuckMail login or remove already synchronized records.
+
+### [Hosted Messages] GET /messages
+Read locally synchronized message metadata; the response does not wait for a full Microsoft sync.
+Auth: Required (mailbox token)
+Query:
+- page: default 1; 30 messages per page, newest first.
+- folder: all (default), inbox or junk.
+- from, subject: optional case-insensitive substring filters, each up to 200 UTF-8 bytes.
+- receivedAfter: optional RFC3339 timestamp; cannot extend the normal recent-7-day listing window.
+- seen: optional true or false.
+Response (200): Hydra message collection as documented above, plus a top-level sync object with the same fields as GET /me's hosting object. Message bodies are not included.
+Interpretation:
+- hydra:totalItems counts matching local records, not the remote Microsoft mailbox total.
+- sync.initialSyncComplete=false: first synchronization is incomplete.
+- sync.stale=true: cached records may be out of date. Check sync.lastSuccessAt and sync.status.
+- sync.truncated=true: the indexed result is incomplete.
+- An empty list with incomplete/stale sync is not proof that the remote mailbox is empty.
+
+### [Hosted Messages] GET /messages/{id}
+Read message details, body and attachment metadata.
+Auth: Required (mailbox token)
+Path: id from the message list, not the account ID or a Microsoft/IMAP identifier.
+Response (200): The shared message-detail structure above. Body/source may be fetched from Microsoft on demand and temporarily cached. Use returned downloadUrl values for source and attachment downloads.
+
+### [Hosted Messages] GET /sources/{id}
+Read raw MIME in a JSON wrapper.
+Auth: Required (mailbox token)
+Response (200):
+```json
+{
+  "id": "message-id",
+  "downloadUrl": "/messages/message-id/source",
+  "data": "From: sender@example.com\r\nTo: example@outlook.com\r\n\r\nMessage body"
+}
+```
+
+### [Hosted Downloads] GET /messages/{id}/source
+Download raw MIME directly.
+Auth: Required (mailbox token)
+Response: 200, Content-Type: message/rfc822, raw bytes; not JSON.
+Notes: Maximum source size is 25 MiB. Send Authorization when downloading; do not assume the URL is public.
+
+### [Hosted Downloads] GET /messages/{id}/attachments/{attachmentId}
+Download an attachment.
+Auth: Required (mailbox token)
+Path: Use the returned attachment downloadUrl/ID from message details; do not invent attachment IDs.
+Response: 200, the attachment's Content-Type and raw bytes; not JSON.
+
+### [Hosted Messages] PATCH /messages/{id}
+Mark a message as seen locally.
+Auth: Required (mailbox token)
+Request: No body required. This operation marks seen=true; it does not toggle unread or update Microsoft read state.
+Response (200):
+```json
+{ "seen": true }
+```
+
+### [Hosted Messages] DELETE /messages/{id}
+Hide a message locally.
+Auth: Required (mailbox token)
+Response: 204 No Content.
+Notes: Does not delete the Microsoft original. Hidden messages no longer appear in the normal local list.
+
+### [Hosted Accounts] POST /accounts/{id}/sync
+Schedule synchronization of one hosted mailbox.
+Auth: Required (owner API Key OR that mailbox's token)
+Request: No body required.
+Response (202):
+```json
+{ "status": "scheduled", "accountId": "account-id" }
+```
+Notes: 202 does not mean synchronization is complete. Inspect the sync field from GET /messages or the hosting field from GET /me afterward. A paused/disabled account returns 409; required Microsoft reauthorization returns 424.
+
+### [Hosted Accounts] PATCH /accounts/{id}
+Update account settings.
+Auth: Required (owner API Key)
+Request (all fields optional; include only changes):
+```json
+{ "label": "Test mailbox", "tags": ["testing"], "paused": false, "status": "active" }
+```
+Fields: label up to 120 UTF-8 bytes; up to 10 tags of 60 UTF-8 bytes each; paused is boolean; status is active or disabled.
+Response: 204 No Content.
+Notes: Changing account status invalidates existing mailbox tokens. Pausing sync is separate from disabling the account.
+
+### [Hosted Accounts] POST /accounts/{id}/password
+Reset the independent DuckMail access password.
+Auth: Required (owner API Key)
+Request:
+```json
+{ "password": "new-example-access-password" }
+```
+Validation: At least 8 characters and at most 72 UTF-8 bytes.
+Response: 204 No Content.
+Notes: Invalidates existing mailbox tokens, including API-Key-derived tokens. Obtain a new token afterward. Does not change the Microsoft password.
+
+### [Hosted Connections] GET /accounts/{id}/connection
+Inspect the current connection.
+Auth: Required (owner API Key)
+Response (200): An object containing account (account view), hosting (hosting state) and clientId (original Microsoft application ID). No refresh token, access password or decrypted Microsoft credentials are returned.
+
+### [Hosted Connections] POST /accounts/{id}/connection
+Replace Microsoft authorization asynchronously.
+Auth: Required (owner API Key)
+Headers: Content-Type: application/json; optional Idempotency-Key.
+Request:
+```json
+{
+  "protocol": "graph",
+  "clientId": "11111111-2222-3333-4444-555555555555",
+  "refreshToken": "<NEW_MICROSOFT_REFRESH_TOKEN>"
+}
+```
+Response (202):
+```json
+{ "importId": "import-id" }
+```
+Notes:
+- Poll GET /accounts/imports/{importId} to check the result. Replacement requires an active account and the same Microsoft identity.
+- Keep the existing protocol. Omitting protocol or using auto still preserves the existing protocol; this endpoint cannot switch a Graph account to IMAP or vice versa.
+- Account ID and DuckMail access password remain unchanged.
+
+### [Hosted Accounts] DELETE /accounts/{id}
+Remove hosting, credentials and related local cache.
+Auth: Required (owner API Key). A mailbox token cannot delete a hosted account.
+Response: 204 No Content.
+Notes: Does not delete the Microsoft mailbox or any original Microsoft messages.
+
+### Microsoft-specific errors and limits
+
+- DuckMail 401: missing, invalid, expired or revoked DuckMail credentials. Do not treat it as a Microsoft refresh-token error.
+- 424 UPSTREAM_REAUTH_REQUIRED: the owner must replace Microsoft authorization. Repeated DuckMail logins do not fix it.
+- 429 UPSTREAM_THROTTLED: Microsoft requested backoff. Respect Retry-After; it is not proof of an IP abuse penalty.
+- 502/503: temporary upstream/service failure; use bounded retries and honor Retry-After when supplied. Import rows follow the stricter 15-second/single-HTTP-500-retry policy above; do not assume a failed row will restart automatically.
+- IMPORT_TIMEOUT in an import row: the 10-second processing deadline expired. The row is terminally failed; retry it explicitly if desired.
+- Hosted errors can include code and retryable in addition to error/message. Branch on HTTP status and code, not localized message text.
+- Graph requires identity verification and mail-read permission. IMAP requires OAuth authorization and enabled IMAP access. Credentials that require an unsupported confidential-client secret cannot be imported.
+
+---
 
 ## Rate Limits and Retry Behavior
 
