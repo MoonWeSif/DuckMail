@@ -1,3 +1,4 @@
+import { rateLimitedFetch as fetch } from "@/lib/rate-limited-fetch"
 import type { Account } from "@/types";
 import { getApiKey } from "./api";
 export function hasHostingKey() {

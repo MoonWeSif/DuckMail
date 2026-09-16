@@ -7,3 +7,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      # Match the Go API's INBUCKET_DUCKAPI_WEB_PROXY_SECRET; never use NEXT_PUBLIC_ for this value.
+      - DUCKMAIL_WEB_PROXY_SECRET=${DUCKMAIL_WEB_PROXY_SECRET:-}
+      # Enable only behind a proxy that overwrites X-Real-IP, with the Web port private.
+      - DUCKMAIL_TRUST_PROXY_HEADERS=${DUCKMAIL_TRUST_PROXY_HEADERS:-false}

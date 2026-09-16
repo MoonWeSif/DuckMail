@@ -1,3 +1,4 @@
+import { rateLimitedFetch as fetch } from "@/lib/rate-limited-fetch"
 import type { Account, Domain, Message, MessageDetail } from "@/types"
 
 // 直接指向 DuckMail API 服务（默认提供商）
@@ -324,9 +325,6 @@ const refreshTokenPromises = new Map<string, Promise<string | null>>()
 
 // 尝试刷新 *指定账户* 的 token（在收到401时调用）
 async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string | null> {
-  if(account.source === "microsoft" && account.loginMethod === "apiKey") {
-    try { const {exchangeHostedToken}=await import("./hosting-api");const {token}=await exchangeHostedToken(account.address);updateTokenInStorage(account.address,token);return token } catch {return null}
-  }
 
   const inflight = refreshTokenPromises.get(account.address)
   if (inflight) {
@@ -334,7 +332,7 @@ async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string |
   }
 
   let password = account.password
-  if (!password) {
+  if (!password && account.loginMethod !== "apiKey") {
     if (account.source === "microsoft") {
       const { requestHostedRelogin } = await import("./hosting-session")
       requestHostedRelogin(account.address)
@@ -344,6 +342,12 @@ async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string |
 
   const promise = (async () => {
     try {
+      if (account.source === "microsoft" && account.loginMethod === "apiKey") {
+        const { exchangeHostedToken } = await import("./hosting-api")
+        const { token } = await exchangeHostedToken(account.address)
+        updateTokenInStorage(account.address, token)
+        return token
+      }
       const headers = {
         ...createBaseHeaders(account.providerId),
         "Content-Type": "application/json",
@@ -366,6 +370,7 @@ async function tryRefreshToken(account: StoredAccountSnapshot): Promise<string |
       updateTokenInStorage(account.address, newToken)
       return newToken
     } catch (error) {
+      if ((error as { status?: number })?.status === 429) throw error
       console.error("❌ [API] Token refresh error:", error)
       return null
     } finally {
@@ -418,6 +423,7 @@ async function retryFetch<T>(fn: () => Promise<T>, retries = 1, delay = 500): Pr
   try {
     return await fn()
   } catch (error: any) {
+    if (error?.name === "AbortError") throw error
     // 如果错误包含状态码信息，检查是否应该重试
     if (error?.message && typeof error.message === 'string') {
       const statusMatch = error.message.match(/HTTP (\d+)/)

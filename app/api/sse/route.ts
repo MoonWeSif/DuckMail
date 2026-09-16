@@ -1,6 +1,10 @@
+import { rejectNonBrowserRequest } from "@/lib/browser-request";
 import type { NextRequest } from "next/server"
 
 export async function GET(request: NextRequest) {
+  const rejected = rejectNonBrowserRequest(request);
+  if (rejected) return rejected;
+
   const encoder = new TextEncoder()
   const authHeader = request.headers.get("Authorization")
 

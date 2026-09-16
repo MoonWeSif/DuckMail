@@ -1,9 +1,14 @@
+import { rejectNonBrowserRequest } from "@/lib/browser-request";
+import { forwardClientIP } from "@/lib/proxy-client-ip";
 import { NextRequest, NextResponse } from "next/server";
 const BASE =
   process.env.API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   "https://api.duckmail.sbs";
 async function handle(req: NextRequest) {
+  const rejected = rejectNonBrowserRequest(req);
+  if (rejected) return rejected;
+
   const endpoint = req.nextUrl.searchParams.get("endpoint") || "";
   if (
     !/^\/(accounts|token|me|messages|sources|domains|mercure)(\/|\?|$)/.test(
@@ -59,6 +64,12 @@ async function handle(req: NextRequest) {
   for (const h of ["Authorization", "Content-Type", "Idempotency-Key"]) {
     const v = req.headers.get(h);
     if (v) headers.set(h, v);
+  }
+  forwardClientIP(req.headers, headers, url, configured);
+  // Server-only secret: never accept it from the browser or send it to another provider.
+  const proxySecret = process.env.DUCKMAIL_WEB_PROXY_SECRET;
+  if (url.origin === configured.origin && proxySecret && Buffer.byteLength(proxySecret) >= 32) {
+    headers.set("X-DuckMail-Web-Secret", proxySecret);
   }
   try {
     const body = ["GET", "HEAD"].includes(req.method)

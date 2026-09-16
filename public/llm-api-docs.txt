@@ -199,8 +199,11 @@ Status codes:
 - 401: Unauthorized (missing or invalid token)
 - 403: Forbidden (no permission)
 - 404: Not Found
-- 409: Conflict (e.g. email address already exists)
-- 422: Unprocessable Entity (validation failed)
+- 409: Conflict (e.g. an idempotency key reused with different import content)
+- 422: Unprocessable Entity (validation failed or an SMTP email address already exists)
+- 424: Microsoft authorization needs renewal (UPSTREAM_REAUTH_REQUIRED)
+- 429: Rate limited; respect Retry-After in seconds
+- 502/503: Temporary upstream or service failure
 - 500: Internal Server Error
 
 ---
@@ -236,11 +239,11 @@ curl https://api.duckmail.sbs/domains \
 
 ## Microsoft Hosted Accounts
 
-Hosted mailboxes use the same /accounts, /token, /me and /messages APIs as temporary mailboxes. password is an independent DuckMail access password, NOT the actual Microsoft password.
+Hosted mailboxes use /accounts/imports for creation, then /token, /me and /messages for mailbox access. POST /accounts creates SMTP temporary accounts only. password is an independent DuckMail access password, NOT the actual Microsoft password.
 
 Public hosted management requires an API Key. Panel owner sessions may call the same paths.
 
-POST /accounts/imports {entries:[...]} imports up to 500. Nested connection remains accepted. Returns HTTP 202 {importId,statusUrl}. Poll GET /accounts/imports/{importId}.
+POST /accounts/imports {entries:[...]} imports up to 500. Nested connection remains accepted. Returns HTTP 202 {importId,statusUrl}, which confirms queue acceptance, not successful import. Poll GET /accounts/imports/{importId} every 2 seconds until complete, honoring Retry-After on 429. Access passwords must be 8–72 bytes. protocol defaults to auto: Graph first, falling back to IMAP only for explicit protocol-permission failures. Explicit graph/imap uses only that protocol; throttling and network failures do not trigger protocol switching.
 
 Management endpoints (API Key required):
 GET /accounts/hosted?page=1&q=&status= — hosted accounts only, Hydra pagination, 30 per page.
@@ -260,3 +263,20 @@ PATCH /messages/{id} and DELETE /messages/{id} affect only local seen/hidden sta
 One API Key accesses all private domains and hosted mailboxes owned by its user, including local seen/hide and management. No per-key permissions or mailbox selection. Existing domain Keys work directly. Revoking a Key invalidates its derived account tokens, not independent password sessions.
 
 Microsoft upstream authorization failure uses code UPSTREAM_REAUTH_REQUIRED (HTTP 424), not DuckMail 401. Refresh tokens are encrypted server-side, never returned. Same address has one DuckMail account; duplicate imports do not overwrite passwords. Graph import requires identity verification and Mail.Read permission; IMAP requires OAuth and enabled IMAP access. Imported confidential-client credentials requiring a secret are unsupported. No send-mail or remote delete is performed.
+
+## Rate Limits and Retry Behavior
+
+Current public deployment limits per IP: 1,000 requests/second with a valid JWT or API Key; 1,000 requests/second without authentication, except unauthenticated POST /accounts at 200 requests/second. Self-hosted limits depend on deployment settings. Repeated invalid requests can reduce the allowance to 1/10, then 1/100, then block the IP for 10 minutes. Duplicates, missing resources, configuration errors and authentication failures have more lenient thresholds than malformed requests or nonexistent creation domains. Limits do not replace account authentication or permissions.
+
+A rate-limit response is English JSON, HTTP 429, with Retry-After in seconds, for example:
+{"error":"Too Many Requests","message":"Too many abnormal requests from this IP. Access is temporarily rate limited. Please retry later.","detail":"Too many abnormal requests from this IP. Access is temporarily rate limited. Please retry later."}
+
+Wait at least Retry-After before making more requests to that backend. Do not repeatedly exchange tokens or recreate accounts on 429. If Retry-After is absent, use capped exponential backoff. After an IP block, allowance recovers from 1/100 one level at a time after each 5-minute violation-free period. A normal 2-second polling interval does not override cooldowns or guarantee Microsoft synchronization within 2 seconds. Check sync fields before interpreting empty hosted lists. No new mandatory parameters or client-side password hashing are needed.
+
+Microsoft UPSTREAM_THROTTLED also uses HTTP 429 and Retry-After; temporary upstream failures do not count toward IP abuse penalties. Handle DuckMail 401 separately from Microsoft UPSTREAM_REAUTH_REQUIRED (424).
+
+Self-hosters can exempt their Web server from backend rate limiting using a server-only shared secret. That is a deployment option, not a public client authentication method; API keys and mailbox tokens are still required where specified. A publicly accessible Web proxy with exemption enabled also exempts scripts using that proxy.
+
+SMTP message retention and account expiry are independent and depend on deployment settings; messages are not guaranteed to remain for three days. Microsoft hosting exposes recent synchronized metadata and reads/caches message content on demand. Local cache cleanup or hiding a hosted message never deletes Microsoft originals.
+
+The Web-only /api/mail and /api/sse proxy routes perform basic same-origin browser checks and return 403 for missing Fetch Metadata headers, cross-site requests or direct navigation. API integrations should call the Base URL above directly. These checks are not proof of a human browser and do not replace backend authentication.

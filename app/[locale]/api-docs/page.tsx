@@ -1,4 +1,5 @@
 "use client"
+import { rateLimitedFetch as fetch } from "@/lib/rate-limited-fetch"
 
 import { useState, useTransition } from "react"
 import {
@@ -26,6 +27,8 @@ import {
 } from "lucide-react"
 import { useTranslations, useLocale } from "next-intl"
 import { useRouter, usePathname } from "@/i18n/navigation"
+
+const llmDocsPath = "/llm-api-docs.txt"
 
 const ApiEndpointCard = ({ endpoint, t }: { endpoint: any; t: any }) => {
   const [apiKey, setApiKey] = useState("")
@@ -224,7 +227,7 @@ export default function ApiDocsPage() {
       endpoints: [
         { method: "GET", path: "/accounts/hosted", description: t("hostedListDesc"), authType: "required-apikey" },
         { method: "POST", path: "/token", description: t("hostedTokenDesc"), authType: "required-apikey", body: JSON.stringify({ address: "example@outlook.com" }, null, 2) },
-        { method: "POST", path: "/accounts/imports", description: t("hostedImportDesc"), authType: "required-apikey", body: JSON.stringify({ entries: [{ address: "example@outlook.com", password: "<独立DuckMail访问密码>", refreshToken: "<refresh_token>", clientId: "<原应用client_id>" }] }, null, 2) },
+        { method: "POST", path: "/accounts/imports", description: t("hostedImportDesc"), authType: "required-apikey", body: JSON.stringify({ entries: [{ address: "example@outlook.com", password: "<DuckMail_access_password>", protocol: "auto", refreshToken: "<refresh_token>", clientId: "<original_client_id>" }] }, null, 2) },
         { method: "GET", path: "/accounts/imports/{importId}", description: t("hostedImportGetDesc"), authType: "required-apikey", pathParams: [{ name: "importId", value: "" }] },
         { method: "PATCH", path: "/accounts/{id}", description: t("hostedPatchDesc"), authType: "required-apikey", pathParams: [{ name: "id", value: "" }], body: JSON.stringify({ label: "", paused: false, status: "active" }, null, 2) },
         { method: "DELETE", path: "/accounts/{id}", description: t("hostedDeleteDesc"), authType: "required-apikey", pathParams: [{ name: "id", value: "" }] },
@@ -262,13 +265,13 @@ export default function ApiDocsPage() {
               <p className="text-default-600 mb-4">{t("llmDocsDescription")}</p>
               <div className="flex items-center gap-3 bg-default-100 rounded-lg p-3 mb-4">
                 <NextCode className="text-sm flex-1 truncate">
-                  https://raw.githubusercontent.com/MoonWeSif/DuckMail/main/public/llm-api-docs.txt
+                  {llmDocsPath}
                 </NextCode>
               </div>
               <div className="flex gap-3">
                 <Button
                   as="a"
-                  href="https://raw.githubusercontent.com/MoonWeSif/DuckMail/main/public/llm-api-docs.txt"
+                  href={llmDocsPath}
                   target="_blank"
                   rel="noopener noreferrer"
                   color="primary"
@@ -284,7 +287,7 @@ export default function ApiDocsPage() {
                   onPress={async () => {
                     try {
                       await navigator.clipboard.writeText(
-                        "https://raw.githubusercontent.com/MoonWeSif/DuckMail/main/public/llm-api-docs.txt"
+                        new URL(llmDocsPath, window.location.origin).href
                       )
                       setCopySuccess(true)
                       setTimeout(() => setCopySuccess(false), 2000)
@@ -337,6 +340,18 @@ export default function ApiDocsPage() {
                   {t("apiKeyDescription_post")}
                 </p>
               </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h2 className="text-2xl font-semibold">{t("rateLimits")}</h2>
+            </CardHeader>
+            <CardBody className="space-y-3 text-default-600">
+              <p>{t("rateLimitsDescription")}</p>
+              <p>{t("retryDescription")}</p>
+              <h3 className="font-semibold text-default-900">{t("errorHandling")}</h3>
+              <p>{t("errorHandlingDescription")}</p>
             </CardBody>
           </Card>
 
